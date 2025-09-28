@@ -1,0 +1,119 @@
+{
+  "folders": [
+    {
+      "name": "robOS",
+      "path": "."
+    }
+  ],
+  "settings": {
+    // GitHub Copilot specific settings
+    "github.copilot.enable": {
+      "*": true,
+      "yaml": false,
+      "plaintext": false,
+      "markdown": true,
+      "c": true,
+      "cpp": true,
+      "cmake": true,
+      "json": true,
+      "jsonc": true
+    },
+    
+    // Advanced Copilot settings
+    "github.copilot.advanced": {
+      "debug.overrideNodeVersion": "20.x",
+      "debug.testOverrideProxyUrl": "",
+      "debug.overrideProxyUrl": ""
+    },
+    
+    // File exclusions for better performance and context
+    "files.exclude": {
+      "build/": true,
+      "**/.DS_Store": true,
+      "**/managed_components/": true,
+      "**/dependencies.lock": true,
+      "**/*.bin": true,
+      "**/*.elf": true,
+      "**/*.map": true
+    },
+    
+    // Search exclusions
+    "search.exclude": {
+      "build/": true,
+      "**/managed_components/": true,
+      "**/node_modules": true,
+      "**/*.log": true,
+      "**/sdkconfig": true
+    },
+    
+    // File watcher exclusions for performance
+    "files.watcherExclude": {
+      "**/build/**": true,
+      "**/.git/objects/**": true,
+      "**/.git/subtree-cache/**": true,
+      "**/managed_components/**": true,
+      "**/*.bin": true,
+      "**/*.elf": true,
+      "**/*.map": true,
+      "**/*.log": true
+    },
+    
+    // Language specific settings for better Copilot suggestions
+    "[c]": {
+      "editor.tabSize": 4,
+      "editor.insertSpaces": true,
+      "editor.formatOnSave": true,
+      "github.copilot.enable": true
+    },
+    
+    "[cpp]": {
+      "editor.tabSize": 4,
+      "editor.insertSpaces": true,
+      "editor.formatOnSave": true,
+      "github.copilot.enable": true
+    },
+    
+    "[cmake]": {
+      "editor.tabSize": 4,
+      "editor.insertSpaces": true,
+      "github.copilot.enable": true
+    },
+    
+    "[markdown]": {
+      "editor.wordWrap": "on",
+      "editor.quickSuggestions": {
+        "comments": "off",
+        "strings": "off",
+        "other": "off"
+      },
+      "github.copilot.enable": true
+    },
+    
+    // C/C++ specific settings for ESP-IDF
+    "C_Cpp.intelliSenseEngine": "disabled",
+    "C_Cpp.autocomplete": "disabled",
+    "C_Cpp.errorSquiggles": "disabled",
+    
+    // Use clangd for better IntelliSense
+    "clangd.onConfigChanged": "restart",
+    "clangd.serverCompletionRanking": true,
+    "clangd.arguments": [
+      "--background-index",
+      "--clang-tidy",
+      "--header-insertion=never",
+      "--completion-style=detailed",
+      "--function-arg-placeholders=false"
+    ]
+  },
+  
+  "extensions": {
+    "recommendations": [
+      "ms-vscode.cpptools",
+      "llvm-vs-code-extensions.vscode-clangd",
+      "espressif.esp-idf-extension",
+      "github.copilot",
+      "github.copilot-chat",
+      "ms-vscode.cmake-tools"
+    ]
+  }
+}

@@ -14,10 +14,13 @@ sdkconfig.defaults.old
 dependencies.lock
 managed_components/
 
-# IDE Files
-.vscode/
+# IDE Files - Keep shared configuration
+.vscode/launch.json
+.vscode/tasks.json
+.vscode/c_cpp_properties.json
 .idea/
-*.code-workspace
+# Personal VS Code settings that shouldn't be shared
+.vscode/.ropeproject/
 
 # macOS System Files
 .DS_Store

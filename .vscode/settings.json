@@ -1,0 +1,61 @@
+{
+  "idf.espIdfPath": "/Users/thomas/esp/v5.5.1/esp-idf",
+  "idf.toolsPath": "/Users/thomas/.espressif",
+  "idf.pythonInstallPath": "/usr/bin/python3",
+  "idf.port": "/dev/cu.usbmodem01234567891",
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ],
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "clangd.path": "/Users/thomas/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=/Users/thomas/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc",
+    "--compile-commands-dir=/Users/thomas/rm01/robOS/build"
+  ],
+  "idf.flashType": "UART",
+  
+  // GitHub Copilot Configuration
+  "github.copilot.enable": {
+    "*": true,
+    "yaml": false,
+    "plaintext": false
+  },
+  
+  // Copilot workspace file exclusions for better context
+  "github.copilot.advanced": {
+    "debug.overrideNodeVersion": "20.x"
+  },
+  
+  "files.watcherExclude": {
+    "**/build/**": true,
+    "**/.vscode/**": true,
+    "**/sdkconfig": true,
+    "**/sdkconfig.old": true,
+    "**/*.bin": true,
+    "**/*.elf": true,
+    "**/*.map": true,
+    "**/*.log": true,
+    "**/.DS_Store": true,
+    "**/managed_components/**": true,
+    "**/dependencies.lock": true
+  },
+  
+  "files.exclude": {
+    "build/": true,
+    "**/.DS_Store": true,
+    "**/managed_components/": true,
+    "**/dependencies.lock": true
+  },
+  
+  "search.exclude": {
+    "build/": true,
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/*.code-search": true,
+    "**/managed_components/": true,
+    "**/sdkconfig": true
+  }
+}

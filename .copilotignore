@@ -1,0 +1,107 @@
+# GitHub Copilot Ignore File
+# This file tells Copilot which files should be excluded from context
+
+# Build artifacts and generated files
+build/
+*.bin
+*.elf
+*.map
+*.hex
+*.log
+
+# ESP-IDF specific generated files
+sdkconfig
+sdkconfig.old
+sdkconfig.defaults.old
+managed_components/
+dependencies.lock
+
+# Large documentation files that might pollute context
+docs/doxygen_output/
+docs/_build/
+
+# IDE configuration files
+.vscode/
+.idea/
+*.code-workspace
+
+# System files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*~
+*.swp
+*.swo
+*.bak
+*.backup
+
+# Test output and coverage
+test_results/
+coverage/
+*.gcda
+*.gcno
+*.gcov
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+
+# C/C++ object files
+*.o
+*.a
+*.so
+*.dylib
+*.su
+*.idb
+*.pdb
+
+# Version control
+.git/
+
+# Package managers
+node_modules/
+bower_components/
+
+# Environment files
+.env
+.env.local
+
+# Flash download tool
+flash_project_args
+
+# Partition tables (generated)
+partition_table/
+
+# Bootloader (generated)
+bootloader/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+
+# Large binary blobs or data files
+*.dat
+*.blob
+
+# Compiled documentation
+*.pdf
+*.dvi
+*.ps
+
+# Archive files
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar

@@ -1,0 +1,19 @@
+{
+  "idf.espIdfPath": "/Users/thomas/esp/v5.5.1/esp-idf",
+  "idf.toolsPath": "/Users/thomas/.espressif",
+  "idf.pythonInstallPath": "/usr/bin/python3",
+  "idf.port": "/dev/cu.usbmodem01234567891",
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ],
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "clangd.path": "/Users/thomas/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
+  "clangd.arguments": [
+    "--background-index",
+    "--query-driver=/Users/thomas/.espressif/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc",
+    "--compile-commands-dir=/Users/thomas/rm01/robOS/tests/test_event_manager/build"
+  ],
+  "idf.flashType": "UART"
+}
