@@ -10,6 +10,7 @@ idf_component_register(
         console
         console_core
         config_manager
+        board_led
     PRIV_REQUIRES
         esp_adc
         soc

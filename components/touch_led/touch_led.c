@@ -15,9 +15,13 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "console_core.h"
+#include "board_led.h"
 #include <string.h>
 #include <math.h>
 #include "config_manager.h"
+
+// Forward declaration for board_led console handler
+extern esp_err_t board_led_console_handler(int argc, char **argv);
 
 static const char *TAG = "touch_led";
 
@@ -1178,10 +1182,23 @@ static esp_err_t cmd_led_touch(int argc, char **argv)
         printf("Unknown touch LED command: %s\n", argv[2]);
         printf("Use 'led touch help' for available commands\n");
         return ESP_ERR_INVALID_ARG;
+    } else if (strcasecmp(argv[1], "board") == 0) {
+        // Forward board LED commands to board_led component
+        if (board_led_is_initialized()) {
+            // Call board_led's console handler with the remaining arguments
+            return board_led_console_handler(argc, argv);
+        } else {
+            printf("Board LED system not initialized\n");
+            return ESP_ERR_INVALID_STATE;
+        }
     } else {
-        printf("This LED controller is for touch LED only.\n");
-        printf("Use 'led touch <command>' to control the touch LED.\n");
-        printf("Use 'led touch help' for available commands\n");
+        printf("LED subsystem not recognized: %s\n", argv[1]);
+        printf("Available subsystems:\n");
+        printf("  led touch <command>  - Control touch LED\n");
+        if (board_led_is_initialized()) {
+            printf("  led board <command>  - Control board LEDs\n");
+        }
+        printf("Use 'led <subsystem> help' for available commands\n");
         return ESP_ERR_INVALID_ARG;
     }
 }

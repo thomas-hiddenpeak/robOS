@@ -25,6 +25,7 @@
 #include "config_manager.h"
 #include "fan_controller.h"
 #include "touch_led.h"
+#include "board_led.h"
 
 static const char *TAG = "ROBOS_MAIN";
 
@@ -264,6 +265,18 @@ static esp_err_t system_init(void)
         return ret;
     }
     ESP_LOGI(TAG, "System commands registered");
+    
+    // Initialize Board LED System
+    ESP_LOGI(TAG, "Initializing board LED system...");
+    ret = board_led_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize board LED: %s", esp_err_to_name(ret));
+        // Board LED is not critical, continue with warning
+        ESP_LOGW(TAG, "Continuing without board LED functionality");
+    } else {
+        ESP_LOGI(TAG, "Board LED controller initialized (GPIO %d, %d LEDs)", 
+                 BOARD_LED_GPIO_PIN, BOARD_LED_COUNT);
+    }
     
     // TODO: Initialize other components (Ethernet, Storage, etc.)
     
