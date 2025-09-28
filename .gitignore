@@ -1,0 +1,114 @@
+# ESP-IDF Build System
+build/
+sdkconfig
+sdkconfig.old
+sdkconfig.defaults.old
+
+# ESP-IDF Generated Files
+*.bin
+*.elf
+*.map
+*.hex
+
+# Dependencies and Managed Components
+dependencies.lock
+managed_components/
+
+# IDE Files
+.vscode/
+.idea/
+*.code-workspace
+
+# macOS System Files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Thumbnails
+Thumbs.db
+
+# Temporary Files
+*.tmp
+*.temp
+*~
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Python Cache (for build scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+
+# C/C++ Object Files
+*.o
+*.a
+*.so
+*.dylib
+
+# Debug Information
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Test Output
+test_results/
+coverage/
+*.gcda
+*.gcno
+*.gcov
+
+# Documentation Build
+docs/_build/
+docs/doxygen_output/
+
+# Environment Variables
+.env
+.env.local
+
+# Flash Download Tool
+flash_project_args
+
+# Partition Tables (generated)
+partition_table/
+
+# bootloader (generated)
+bootloader/
+
+# Espressif Tools
+.espressif/
+
+# VS Code Extensions
+.vscode/extensions/
+
+# JetBrains IDEs
+*.iml
+*.ipr
+*.iws
+out/
+
+# Eclipse CDT
+.cproject
+.project
+.settings/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Backup Files
+*.bak
+*.backup
+
+# Custom Build Scripts Output
+tools/output/
