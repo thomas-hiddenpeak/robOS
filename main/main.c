@@ -26,6 +26,7 @@
 #include "fan_controller.h"
 #include "touch_led.h"
 #include "board_led.h"
+#include "storage_manager.h"
 
 static const char *TAG = "ROBOS_MAIN";
 
@@ -278,7 +279,28 @@ static esp_err_t system_init(void)
                  BOARD_LED_GPIO_PIN, BOARD_LED_COUNT);
     }
     
-    // TODO: Initialize other components (Ethernet, Storage, etc.)
+    // 7. Storage Manager (TF card file system)
+    ESP_LOGI(TAG, "Initializing storage manager...");
+    storage_config_t storage_config;
+    storage_manager_get_default_config(&storage_config);
+    ret = storage_manager_init(&storage_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize storage manager: %s", esp_err_to_name(ret));
+        // Storage is not critical for system boot, continue with warning
+        ESP_LOGW(TAG, "Continuing without storage functionality");
+    } else {
+        ESP_LOGI(TAG, "Storage manager initialized");
+        
+        // Register storage console commands
+        ret = storage_manager_register_console_commands();
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to register storage commands: %s", esp_err_to_name(ret));
+        } else {
+            ESP_LOGI(TAG, "Storage commands registered");
+        }
+    }
+    
+    // TODO: Initialize other components (Ethernet, etc.)
     
     ESP_LOGI(TAG, "robOS system initialization completed");
     return ret;

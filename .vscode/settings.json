@@ -2,7 +2,7 @@
   "idf.espIdfPath": "/Users/thomas/esp/v5.5.1/esp-idf",
   "idf.toolsPath": "/Users/thomas/.espressif",
   "idf.pythonInstallPath": "/usr/bin/python3",
-  "idf.port": "/dev/cu.usbmodem01234567891",
+  "idf.port": "/dev/tty.usbmodem01234567891",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],

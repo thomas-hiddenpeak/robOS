@@ -23,7 +23,7 @@
  * Constants and Macros
  * ============================================================================ */
 
-#define CONSOLE_TASK_STACK_SIZE         (4096)
+#define CONSOLE_TASK_STACK_SIZE         (8192)
 #define CONSOLE_TASK_PRIORITY           (5)
 #define CONSOLE_QUEUE_SIZE              (10)
 #define CONSOLE_UART_TIMEOUT_MS         (100)
@@ -987,6 +987,10 @@ esp_err_t console_readline(char *buffer, size_t buffer_size, uint32_t timeout_ms
             
             if (ch == '\r' || ch == '\n') {
                 buffer[pos] = '\0';
+                // 确保换行，移动光标到下一行开始
+                if (s_console_ctx.config.echo_enabled) {
+                    console_print("\r\n");
+                }
                 return ESP_OK;
             } else if (ch == '\b' || ch == 0x7F) {  // Backspace
                 if (pos > 0) {

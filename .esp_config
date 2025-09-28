@@ -1,0 +1,12 @@
+# ESP32S3 Device Configuration
+# This file stores the fixed configuration for ESP32S3 development board
+
+# Serial port for ESP32S3 device (FIXED - do not change)
+ESP_PORT=/dev/cu.usbmodem01234567891
+
+# Other ESP32S3 specific settings
+ESP_CHIP=esp32s3
+ESP_BAUD=460800
+FLASH_MODE=dio
+FLASH_FREQ=80m
+FLASH_SIZE=detect
