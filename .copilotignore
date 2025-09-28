@@ -9,6 +9,18 @@ build/
 *.hex
 *.log
 
+# Test project build directories and generated files
+tests/*/build/
+tests/*/sdkconfig
+tests/*/sdkconfig.old
+tests/*/managed_components/
+tests/*/dependencies.lock
+tests/*/*.bin
+tests/*/*.elf
+tests/*/*.map
+tests/*/*.hex
+tests/*/*.log
+
 # ESP-IDF specific generated files
 sdkconfig
 sdkconfig.old

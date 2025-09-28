@@ -1,0 +1,21 @@
+## IDF Component Manager Manifest File
+## This file is used to manage external dependencies for the robOS project
+
+dependencies:
+  # WS2812 LED Strip driver - Official Espressif component
+  led_strip:
+    version: "^2.5.0"
+    
+  # Optional: Advanced LED effects library
+  # ws2812_effects:
+  #   version: "^1.0.0"
+  #   git: "https://github.com/espressif/esp-led-effects.git"
+
+# Component-specific settings
+targets:
+  - esp32
+  - esp32s2
+  - esp32s3
+  - esp32c3
+  - esp32c6
+  - esp32h2

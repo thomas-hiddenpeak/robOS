@@ -1,0 +1,15 @@
+## IDF Component Manager Manifest File for touch_led component
+
+dependencies:
+  # WS2812 LED Strip driver - Official Espressif component
+  led_strip:
+    version: "^2.5.0"
+    
+# Component-specific settings for touch_led
+targets:
+  - esp32
+  - esp32s2  
+  - esp32s3
+  - esp32c3
+  - esp32c6
+  - esp32h2

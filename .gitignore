@@ -4,6 +4,13 @@ sdkconfig
 sdkconfig.old
 sdkconfig.defaults.old
 
+# Test project build artifacts
+tests/*/build/
+tests/*/sdkconfig
+tests/*/sdkconfig.old
+tests/*/managed_components/
+tests/*/dependencies.lock
+
 # ESP-IDF Generated Files
 *.bin
 *.elf

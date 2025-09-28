@@ -29,33 +29,44 @@
     // File exclusions for better performance and context
     "files.exclude": {
       "build/": true,
+      "tests/*/build/": true,
       "**/.DS_Store": true,
       "**/managed_components/": true,
+      "tests/*/managed_components/": true,
       "**/dependencies.lock": true,
+      "tests/*/dependencies.lock": true,
       "**/*.bin": true,
       "**/*.elf": true,
-      "**/*.map": true
+      "**/*.map": true,
+      "tests/*/sdkconfig": true
     },
     
     // Search exclusions
     "search.exclude": {
       "build/": true,
+      "tests/*/build/": true,
       "**/managed_components/": true,
+      "tests/*/managed_components/": true,
       "**/node_modules": true,
       "**/*.log": true,
-      "**/sdkconfig": true
+      "**/sdkconfig": true,
+      "tests/*/sdkconfig": true
     },
     
     // File watcher exclusions for performance
     "files.watcherExclude": {
       "**/build/**": true,
+      "tests/*/build/**": true,
       "**/.git/objects/**": true,
       "**/.git/subtree-cache/**": true,
       "**/managed_components/**": true,
+      "tests/*/managed_components/**": true,
       "**/*.bin": true,
       "**/*.elf": true,
       "**/*.map": true,
-      "**/*.log": true
+      "**/*.log": true,
+      "tests/*/sdkconfig": true,
+      "tests/*/sdkconfig.old": true
     },
     
     // Language specific settings for better Copilot suggestions

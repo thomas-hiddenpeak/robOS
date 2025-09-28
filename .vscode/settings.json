@@ -31,31 +31,43 @@
   
   "files.watcherExclude": {
     "**/build/**": true,
+    "tests/*/build/**": true,
     "**/.vscode/**": true,
     "**/sdkconfig": true,
     "**/sdkconfig.old": true,
+    "tests/*/sdkconfig": true,
+    "tests/*/sdkconfig.old": true,
     "**/*.bin": true,
     "**/*.elf": true,
     "**/*.map": true,
     "**/*.log": true,
     "**/.DS_Store": true,
     "**/managed_components/**": true,
-    "**/dependencies.lock": true
+    "tests/*/managed_components/**": true,
+    "**/dependencies.lock": true,
+    "tests/*/dependencies.lock": true
   },
   
   "files.exclude": {
     "build/": true,
+    "tests/*/build/": true,
     "**/.DS_Store": true,
     "**/managed_components/": true,
-    "**/dependencies.lock": true
+    "tests/*/managed_components/": true,
+    "**/dependencies.lock": true,
+    "tests/*/dependencies.lock": true,
+    "tests/*/sdkconfig": true
   },
   
   "search.exclude": {
     "build/": true,
+    "tests/*/build/": true,
     "**/node_modules": true,
     "**/bower_components": true,
     "**/*.code-search": true,
     "**/managed_components/": true,
-    "**/sdkconfig": true
+    "tests/*/managed_components/": true,
+    "**/sdkconfig": true,
+    "tests/*/sdkconfig": true
   }
 }

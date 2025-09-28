@@ -24,8 +24,62 @@
 #include "console_core.h"
 #include "config_manager.h"
 #include "fan_controller.h"
+#include "touch_led.h"
 
 static const char *TAG = "ROBOS_MAIN";
+
+/**
+ * @brief Touch event handler for LED interaction
+ * @param event Touch event type
+ * @param duration Event duration in milliseconds
+ */
+static void touch_event_handler(touch_event_t event, uint32_t duration)
+{
+    switch (event) {
+        case TOUCH_EVENT_PRESS:
+            ESP_LOGI(TAG, "Touch pressed - switching to green");
+            touch_led_stop_animation();
+            touch_led_set_all_color(TOUCH_LED_COLOR_GREEN);
+            touch_led_set_brightness(150);
+            touch_led_update();
+            break;
+            
+        case TOUCH_EVENT_RELEASE:
+            ESP_LOGI(TAG, "Touch released after %lu ms - returning to blue", duration);
+            touch_led_set_all_color(TOUCH_LED_COLOR_BLUE);
+            touch_led_set_brightness(50);
+            touch_led_update();
+            
+            // Start breathing animation immediately (no blocking delay in callback)
+            touch_led_start_animation(TOUCH_LED_ANIM_BREATHE, 30, 
+                                     TOUCH_LED_COLOR_BLUE, TOUCH_LED_COLOR_OFF);
+            break;
+            
+        case TOUCH_EVENT_LONG_PRESS:
+            ESP_LOGI(TAG, "Long press detected (%lu ms) - starting rainbow", duration);
+            touch_led_start_animation(TOUCH_LED_ANIM_RAINBOW, 100,
+                                     TOUCH_LED_COLOR_RED, TOUCH_LED_COLOR_BLUE);
+            break;
+            
+        case TOUCH_EVENT_DOUBLE_TAP:
+            ESP_LOGI(TAG, "Double tap detected - brightness toggle");
+            // Toggle between low and high brightness
+            uint16_t led_count;
+            uint8_t brightness;
+            touch_led_animation_t anim;
+            
+            if (touch_led_get_status(&led_count, &brightness, &anim) == ESP_OK) {
+                uint8_t new_brightness = (brightness < 100) ? 200 : 30;
+                touch_led_set_brightness(new_brightness);
+                touch_led_update();
+                ESP_LOGI(TAG, "Brightness changed from %d to %d", brightness, new_brightness);
+            }
+            break;
+            
+        default:
+            break;
+    }
+}
 
 /**
  * @brief System reboot command handler
@@ -164,6 +218,45 @@ static esp_err_t system_init(void)
     }
     ESP_LOGI(TAG, "Fan commands registered");
     
+    // 6. Touch LED Controller (visual feedback and interaction)
+    touch_led_config_t touch_led_config = {
+        .led_gpio = GPIO_NUM_45,        // WS2812 data line
+        .touch_gpio = GPIO_NUM_NC,      // Touch sensor pin (not configured yet)
+        .led_count = 16,                // Number of LEDs in strip
+        .max_brightness = 200,          // Maximum brightness (0-255)
+        .touch_threshold = 1000,        // Touch detection threshold
+        .touch_invert = false           // Touch logic (false = active low)
+    };
+    
+    ret = touch_led_init(&touch_led_config);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize touch LED: %s", esp_err_to_name(ret));
+        // Touch LED is not critical, continue with warning
+        ESP_LOGW(TAG, "Continuing without touch LED functionality");
+    } else {
+        ESP_LOGI(TAG, "Touch LED controller initialized");
+        
+        // Register touch event callback
+        ret = touch_led_register_callback(touch_event_handler);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to register touch callback: %s", esp_err_to_name(ret));
+        }
+        
+        // Note: Initial LED state and animation are handled by the touch_led_init() function
+        // which loads saved configuration. We don't set default state here to avoid
+        // overriding user's saved preferences.
+        
+        ESP_LOGI(TAG, "Touch LED ready - touch sensor to interact");
+        
+        // Register touch LED commands
+        ret = touch_led_register_commands();
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to register touch LED commands: %s", esp_err_to_name(ret));
+        } else {
+            ESP_LOGI(TAG, "Touch LED commands registered");
+        }
+    }
+    
     // Register system management commands
     ret = register_system_commands();
     if (ret != ESP_OK) {
@@ -172,7 +265,7 @@ static esp_err_t system_init(void)
     }
     ESP_LOGI(TAG, "System commands registered");
     
-    // TODO: Initialize other components (LED, Ethernet, Storage, etc.)
+    // TODO: Initialize other components (Ethernet, Storage, etc.)
     
     ESP_LOGI(TAG, "robOS system initialization completed");
     return ret;
