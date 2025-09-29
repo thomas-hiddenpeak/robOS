@@ -251,7 +251,12 @@ esp_err_t config_manager_set(const char *namespace, const char *key,
 esp_err_t config_manager_get(const char *namespace, const char *key,
                             config_type_t type, void *value, size_t *size)
 {
-    if (!s_config_ctx.initialized || namespace == NULL || key == NULL || value == NULL) {
+    if (!s_config_ctx.initialized || namespace == NULL || key == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // For string and blob types, value can be NULL to query size
+    if (value == NULL && type != CONFIG_TYPE_STRING && type != CONFIG_TYPE_BLOB) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -358,6 +363,9 @@ esp_err_t config_manager_delete(const char *namespace, const char *key)
     if (ret == ESP_OK) {
         s_config_ctx.pending_changes = true;
         ESP_LOGI(TAG, "Deleted config: %s.%s", namespace, key);
+    } else if (ret == ESP_ERR_NVS_NOT_FOUND) {
+        // 配置项不存在是正常情况，不需要记录错误
+        ESP_LOGD(TAG, "Config %s.%s not found (already deleted)", namespace, key);
     } else {
         ESP_LOGE(TAG, "Failed to delete config %s.%s: %s", namespace, key, esp_err_to_name(ret));
     }

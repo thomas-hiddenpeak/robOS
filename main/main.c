@@ -13,6 +13,7 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -26,9 +27,59 @@
 #include "fan_controller.h"
 #include "touch_led.h"
 #include "board_led.h"
+#include "matrix_led.h"
 #include "storage_manager.h"
 
 static const char *TAG = "ROBOS_MAIN";
+
+// Storage mount synchronization
+static SemaphoreHandle_t storage_mount_semaphore = NULL;
+static esp_err_t storage_mount_result = ESP_FAIL;
+
+/**
+ * @brief Storage mount callback for startup auto-mount with synchronization
+ * @param operation Storage operation type
+ * @param result Operation result
+ * @param data User data (unused)
+ */
+static void storage_mount_callback(storage_operation_type_t operation, esp_err_t result, void* data, void* user_data)
+{
+    if (operation == STORAGE_OP_MOUNT) {
+        // Store the mount result for synchronous waiting
+        storage_mount_result = result;
+        
+        if (result == ESP_OK) {
+            ESP_LOGI(TAG, "✓ SD card auto-mount successful - storage ready at /sdcard");
+            ESP_LOGI(TAG, "Use 'sdcard' command to enter interactive storage shell");
+        } else {
+            // 提供更友好的错误信息
+            switch (result) {
+                case ESP_ERR_TIMEOUT:
+                    ESP_LOGW(TAG, "No SD card detected - slot is empty");
+                    ESP_LOGI(TAG, "Insert an SD card and use 'storage mount' to try again");
+                    break;
+                case ESP_ERR_NOT_FOUND:
+                    ESP_LOGW(TAG, "SD card not responding - may be damaged or incompatible");
+                    break;
+                case ESP_ERR_NOT_SUPPORTED:
+                    ESP_LOGW(TAG, "SD card format not supported - may need formatting");
+                    break;
+                case ESP_ERR_INVALID_STATE:
+                    ESP_LOGW(TAG, "SD card slot in use or hardware conflict");
+                    break;
+                default:
+                    ESP_LOGW(TAG, "SD card mount failed: %s", esp_err_to_name(result));
+                    break;
+            }
+            ESP_LOGI(TAG, "robOS will continue without storage - insert card and use 'storage mount' when ready");
+        }
+        
+        // Signal that mount operation is complete
+        if (storage_mount_semaphore != NULL) {
+            xSemaphoreGive(storage_mount_semaphore);
+        }
+    }
+}
 
 /**
  * @brief Touch event handler for LED interaction
@@ -279,7 +330,7 @@ static esp_err_t system_init(void)
                  BOARD_LED_GPIO_PIN, BOARD_LED_COUNT);
     }
     
-    // 7. Storage Manager (TF card file system)
+    // 7. Storage Manager (TF card file system) - Initialize first
     ESP_LOGI(TAG, "Initializing storage manager...");
     storage_config_t storage_config;
     storage_manager_get_default_config(&storage_config);
@@ -288,6 +339,7 @@ static esp_err_t system_init(void)
         ESP_LOGE(TAG, "Failed to initialize storage manager: %s", esp_err_to_name(ret));
         // Storage is not critical for system boot, continue with warning
         ESP_LOGW(TAG, "Continuing without storage functionality");
+        storage_mount_result = ESP_FAIL; // Mark as failed for Matrix LED init
     } else {
         ESP_LOGI(TAG, "Storage manager initialized");
         
@@ -298,6 +350,53 @@ static esp_err_t system_init(void)
         } else {
             ESP_LOGI(TAG, "Storage commands registered");
         }
+        
+        // Create synchronization semaphore for mount operation
+        storage_mount_semaphore = xSemaphoreCreateBinary();
+        if (storage_mount_semaphore == NULL) {
+            ESP_LOGE(TAG, "Failed to create storage mount semaphore");
+            storage_mount_result = ESP_FAIL;
+        } else {
+            // Auto-mount SD card at startup and wait for completion
+            ESP_LOGI(TAG, "Attempting to auto-mount SD card...");
+            ret = storage_manager_mount_async(storage_mount_callback, NULL);
+            if (ret != ESP_OK) {
+                ESP_LOGW(TAG, "Failed to initiate SD card mount: %s", esp_err_to_name(ret));
+                ESP_LOGW(TAG, "SD card may not be inserted or may have issues");
+                storage_mount_result = ret;
+            } else {
+                ESP_LOGI(TAG, "SD card mount initiated, waiting for completion...");
+                
+                // Wait for mount operation to complete (timeout: 10 seconds)
+                if (xSemaphoreTake(storage_mount_semaphore, pdMS_TO_TICKS(10000)) == pdTRUE) {
+                    ESP_LOGI(TAG, "Storage mount operation completed with result: %s", 
+                             esp_err_to_name(storage_mount_result));
+                } else {
+                    ESP_LOGW(TAG, "Storage mount operation timed out");
+                    storage_mount_result = ESP_ERR_TIMEOUT;
+                }
+            }
+            
+            // Clean up semaphore
+            vSemaphoreDelete(storage_mount_semaphore);
+            storage_mount_semaphore = NULL;
+        }
+    }
+    
+    // 8. Matrix LED Controller (32x32 WS2812 Matrix) - Initialize after storage
+    ESP_LOGI(TAG, "Initializing matrix LED controller (storage available: %s)...", 
+             storage_mount_result == ESP_OK ? "Yes" : "No");
+    ret = matrix_led_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize matrix LED: %s", esp_err_to_name(ret));
+        // Matrix LED is not critical for system boot, continue with warning
+        ESP_LOGW(TAG, "Continuing without matrix LED functionality");
+    } else {
+        ESP_LOGI(TAG, "Matrix LED controller initialized (GPIO %d, 32x32 matrix, 1024 LEDs)", 
+                 MATRIX_LED_GPIO);
+        
+        // Configuration is loaded automatically during matrix_led_init()
+        // No need to show test pattern here as it will be restored from config
     }
     
     // TODO: Initialize other components (Ethernet, etc.)
@@ -318,6 +417,7 @@ static void main_task(void *pvParameters)
     while (1) {
         // Console core runs in its own task, no need to process here
         // System status can be checked using the 'status' command in console
+        // Use 'matrix_test' command to start Matrix LED testing
         
         // Let other tasks run - longer delay since we're not doing anything
         vTaskDelay(pdMS_TO_TICKS(5000));

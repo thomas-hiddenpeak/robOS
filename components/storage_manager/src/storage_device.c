@@ -125,9 +125,16 @@ esp_err_t storage_device_deinit(void)
 
 bool storage_device_is_card_present(void)
 {
-    // 这里简化处理，实际应该检查卡检测引脚
-    // 或者尝试初始化卡片来判断是否存在
-    return true; // 暂时返回true
+    // 如果已经挂载成功，说明卡存在
+    if (s_device_ctx.mounted && s_device_ctx.card) {
+        return true;
+    }
+    
+    // 在未挂载状态下，我们不能轻易检测卡片存在
+    // 因为需要初始化SDMMC主机，这可能会产生副作用
+    // 最安全的方法是让挂载操作本身来检测卡片
+    // 这样可以避免重复的主机初始化和潜在的竞态条件
+    return false;
 }
 
 esp_err_t storage_device_mount(const char* mount_point, bool format_if_mount_failed)
@@ -149,15 +156,15 @@ esp_err_t storage_device_mount(const char* mount_point, bool format_if_mount_fai
     
     ESP_LOGI(TAG, "Mounting storage device to %s", mount_point);
     
-    // 配置挂载选项（使用BSP项目验证的参数）
+    // 配置挂载选项（针对文件写入优化的参数）
     esp_vfs_fat_mount_config_t mount_config = {
         .format_if_mount_failed = format_if_mount_failed,
-        .max_files = 10,                   // 增加同时打开文件数量
-        .allocation_unit_size = 16 * 1024, // 16KB分配单元
-        .disk_status_check_enable = false  // 禁用磁盘状态检查提高性能
+        .max_files = 20,                   // 增加同时打开文件数量以支持更多操作
+        .allocation_unit_size = 8 * 1024,  // 8KB分配单元，更适合小文件操作
+        .disk_status_check_enable = true   // 启用磁盘状态检查确保文件系统一致性
     };
     
-    ESP_LOGI(TAG, "Attempting SD card mount with 4-bit SDMMC, 40MHz clock");
+    ESP_LOGI(TAG, "Attempting to mount SD card...");
     
     // 挂载FAT文件系统
     esp_err_t ret = esp_vfs_fat_sdmmc_mount(mount_point, 
@@ -167,7 +174,27 @@ esp_err_t storage_device_mount(const char* mount_point, bool format_if_mount_fai
                                             &s_device_ctx.card);
     
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to mount filesystem: %s", esp_err_to_name(ret));
+        // 根据错误类型提供更友好的错误信息
+        switch (ret) {
+            case ESP_ERR_TIMEOUT:
+                ESP_LOGW(TAG, "SD card removed during mount");
+                break;
+            case ESP_ERR_INVALID_STATE:
+                ESP_LOGW(TAG, "SD card slot already in use");
+                break;
+            case ESP_ERR_NOT_FOUND:
+                ESP_LOGW(TAG, "SD card not responding or unsupported");
+                break;
+            case ESP_ERR_NOT_SUPPORTED:
+                ESP_LOGW(TAG, "SD card format not supported");
+                break;
+            case ESP_FAIL:
+                ESP_LOGW(TAG, "SD card initialization failed");
+                break;
+            default:
+                ESP_LOGE(TAG, "Failed to mount filesystem: %s", esp_err_to_name(ret));
+                break;
+        }
         return ret;
     }
     

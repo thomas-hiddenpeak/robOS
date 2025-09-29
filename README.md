@@ -25,7 +25,7 @@
 - ✅ **控制台核心组件** - 8个测试用例全部通过
 - ✅ **配置管理组件** - 统一NVS配置管理，支持多种数据类型
 - ✅ **风扇控制组件** - 完整PWM控制，温度曲线，配置持久化
-- 🚧 **LED控制组件** - 待开发
+- ✅ **Matrix LED组件** - 32x32 WS2812矩阵控制，支持像素绘图、动画播放
 - 📋 **系统监控组件** - 待开发
 
 ## 🏗️ 项目架构
@@ -55,7 +55,7 @@ robOS/
 - **hardware_hal**: GPIO、PWM、SPI、ADC、UART等底层接口抽象
 - **config_manager**: 统一NVS配置管理、多数据类型支持、自动提交
 - **fan_controller**: PWM风扇控制、温度曲线、多模式运行、配置持久化
-- **led_controller**: 板载LED、触控LED、LED矩阵控制和色彩校正
+- **matrix_led**: 32x32 WS2812 LED矩阵控制，像素绘图、动画播放、亮度调节
 - **ethernet_manager**: W5500控制、DHCP服务器、网关功能
 - **storage_manager**: TF卡管理、文件系统操作、NVS配置管理
 - **power_monitor**: 电压监测、电源芯片通信、功率监控
@@ -424,6 +424,184 @@ led touch brightness 200          # 白天模式-高亮度
 led touch brightness 30           # 夜间模式-低亮度
 led touch set white               # 工作照明
 ```
+
+### Matrix LED控制功能 ✨
+- **LED矩阵引脚**: GPIO 9 - 32x32 WS2812矩阵数据线
+- **矩阵规格**: 32x32像素，共1024颗可编程RGB LED
+- **驱动方式**: RMT硬件驱动，支持DMA加速
+- **颜色深度**: 24位真彩色，支持1600万种颜色
+- **显示功能**:
+  - **像素级控制**: 单个像素精确设置和读取
+  - **几何绘图**: 直线、矩形、圆形等基本图形
+  - **图案显示**: 测试图案、自定义图像
+  - **动画播放**: 彩虹、波浪、呼吸、旋转等动态效果
+
+#### Matrix LED工作模式详细说明
+
+**1. 静态显示模式 (static)**
+- 显示固定的图像或图案
+- 支持像素级精确控制
+- 适合状态指示、图标显示
+- 内存占用低，性能稳定
+
+**2. 动画播放模式 (animation)**
+- 支持多种预置动画效果
+- 可配置动画速度、颜色、循环次数
+- 实时动画渲染，流畅播放
+- 支持动画的播放、暂停、停止控制
+
+**3. 自定义模式 (custom)**
+- 支持加载外部动画文件
+- 灵活的动画编程接口
+- 适合复杂的显示需求
+- 可扩展的动画系统
+
+**4. 关闭模式 (off)**
+- 完全关闭LED矩阵显示
+- 节能模式，降低功耗
+- 可用于夜间或待机状态
+
+#### Matrix LED控制命令详解
+
+**基本状态和控制**
+```bash
+led matrix status                    # 显示矩阵状态信息
+led matrix enable on|off             # 启用/禁用矩阵显示
+led matrix brightness 50             # 设置亮度(0-100%)
+```
+
+**像素和图形操作**
+```bash
+led matrix clear                     # 清空所有像素
+led matrix fill 255 0 0              # 填充红色(RGB格式)
+led matrix pixel 10 15 0 255 0       # 设置像素(10,15)为绿色
+led matrix test                      # 显示测试图案
+```
+
+**几何图形绘制**
+```bash
+led matrix draw line 0 0 31 31 255 255 255      # 绘制白色对角线
+led matrix draw rect 5 5 10 8 255 0 255 fill    # 绘制填充紫色矩形
+led matrix draw circle 16 16 8 0 255 255 fill   # 绘制填充青色圆形
+```
+
+**显示模式控制**
+```bash
+led matrix mode static               # 切换到静态显示模式
+led matrix mode animation            # 切换到动画播放模式
+led matrix mode off                  # 关闭矩阵显示
+```
+
+**动画播放控制**
+```bash
+led matrix animation rainbow 70      # 播放彩虹动画，速度70%
+led matrix animation wave 50         # 播放波浪动画，速度50%
+led matrix animation breathe 60      # 播放呼吸动画，速度60%
+led matrix animation rotate 40       # 播放旋转动画，速度40%
+led matrix animation fade 30         # 播放渐变动画，速度30%
+led matrix stop                      # 停止当前动画
+```
+
+**配置管理**
+```bash
+led matrix config save              # 保存当前配置到NVS
+led matrix config load              # 从NVS加载配置
+led matrix config reset             # 重置为默认配置
+```
+
+#### 配置显示格式
+
+**状态概览** (`led matrix status`)：
+```
+Matrix LED Status:
+  Initialized: Yes
+  Enabled: Yes
+  Mode: 1 (Animation)
+  Brightness: 75%
+  Pixel Count: 1024
+  Frame Count: 1520
+  Current Animation: rainbow_70
+```
+
+#### 使用场景示例
+
+**场景1：系统状态指示**
+```bash
+led matrix clear                     # 清空显示
+led matrix fill 0 255 0              # 绿色表示正常状态
+led matrix brightness 30             # 设置适中亮度
+```
+
+**场景2：信息可视化**
+```bash
+led matrix clear
+led matrix draw rect 0 0 32 8 255 0 0 fill      # 红色区域表示CPU使用率
+led matrix draw rect 0 8 24 8 255 255 0 fill    # 黄色区域表示内存使用率
+led matrix draw rect 0 16 16 8 0 0 255 fill     # 蓝色区域表示网络状态
+```
+
+**场景3：装饰效果**
+```bash
+led matrix animation rainbow 60      # 彩虹循环效果
+# 或
+led matrix animation breathe 40      # 柔和的呼吸灯效果
+```
+
+**场景4：测试和调试**
+```bash
+led matrix test                      # 显示测试图案验证硬件
+led matrix pixel 0 0 255 0 0         # 测试左上角像素
+led matrix pixel 31 31 0 0 255       # 测试右下角像素
+```
+
+#### 技术特性
+
+**🎨 丰富的显示功能**
+- 1024个独立控制的RGB LED像素
+- 101级亮度调节(0-100%)
+- 预定义颜色常量和RGB/HSV颜色空间转换
+- 颜色插值和亮度应用算法
+
+**⚡ 高性能渲染**
+- RMT硬件驱动，CPU占用率低
+- DMA传输，支持高帧率显示
+- 双缓冲机制，避免显示撕裂
+- 优化的几何图形绘制算法
+
+**🔧 灵活的控制**
+- 多种显示模式和动画效果
+- 实时动画参数调节
+- 配置持久化存储
+- 完整的控制台命令接口
+
+**🛡️ 可靠性保证**
+- 线程安全的并发访问
+- 完整的错误处理机制
+- 硬件状态监控和恢复
+- 全面的单元测试覆盖
+
+#### 开发状态说明
+
+**✅ 已完成功能**
+- 基础像素控制 - 完全实现
+- 几何图形绘制 - 完全实现
+- 动画播放系统 - 完全实现
+- 亮度和模式控制 - 完全实现
+- 配置持久化 - 完全实现
+- 控制台命令接口 - 完全实现
+- 颜色工具函数 - 完全实现
+
+**🚧 开发中功能**
+- 文本渲染 - 基础框架已实现，字体库待完善
+- 自定义动画加载 - 接口已定义，文件解析待实现
+- 高级特效 - 基础效果已实现，更多效果开发中
+
+**🔧 技术细节**
+- 使用Bresenham算法进行直线绘制
+- 采用中点圆算法进行圆形绘制
+- 支持HSV和RGB颜色空间的双向转换
+- 实现了平滑的颜色插值算法
+- 配置数据通过NVS进行持久化存储
 
 
 ### 以太网功能 (W5500)

@@ -20,8 +20,12 @@
 #include <math.h>
 #include "config_manager.h"
 
-// Forward declaration for board_led console handler
+// Forward declarations for other LED subsystem console handlers
 extern esp_err_t board_led_console_handler(int argc, char **argv);
+extern int matrix_led_cmd_handler(int argc, char **argv);
+
+// Function to check if matrix LED is initialized
+extern bool matrix_led_is_initialized(void);
 
 static const char *TAG = "touch_led";
 
@@ -1191,12 +1195,24 @@ static esp_err_t cmd_led_touch(int argc, char **argv)
             printf("Board LED system not initialized\n");
             return ESP_ERR_INVALID_STATE;
         }
+    } else if (strcasecmp(argv[1], "matrix") == 0) {
+        // Forward matrix LED commands to matrix_led component
+        if (matrix_led_is_initialized()) {
+            // Call matrix_led's console handler with the remaining arguments
+            return matrix_led_cmd_handler(argc - 1, argv + 1);
+        } else {
+            printf("Matrix LED system not initialized\n");
+            return ESP_ERR_INVALID_STATE;
+        }
     } else {
         printf("LED subsystem not recognized: %s\n", argv[1]);
         printf("Available subsystems:\n");
         printf("  led touch <command>  - Control touch LED\n");
         if (board_led_is_initialized()) {
             printf("  led board <command>  - Control board LEDs\n");
+        }
+        if (matrix_led_is_initialized()) {
+            printf("  led matrix <command> - Control 32x32 LED matrix\n");
         }
         printf("Use 'led <subsystem> help' for available commands\n");
         return ESP_ERR_INVALID_ARG;

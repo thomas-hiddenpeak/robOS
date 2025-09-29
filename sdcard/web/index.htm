@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RMinte RM-01 板载网络监控系统</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1>RMinte RM-01 板载网络监控系统</h1>
+        </div>
+    </div>
+    
+    <div class="container">
+        <button id="refresh" class="refresh-button">刷新数据</button>
+        <div id="timestamp">上次更新时间: -</div>
+        <div id="status-container"></div>
+        
+        <footer>
+           RMinte RM-01 板载网络监控系统 &copy; 2025
+        </footer>
+    </div>
+
+    <script>
+        document.getElementById('refresh').addEventListener('click', fetchNetworkStatus);
+        
+        // 页面加载时获取数据
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchNetworkStatus();
+        });
+        
+        // 自动定期刷新
+        setInterval(fetchNetworkStatus, 1000); // 每1秒刷新一次网络状态
+        
+        function fetchNetworkStatus() {
+            fetch('/api/network')
+                .then(response => response.json())
+                .then(data => {
+                    updateStatusDisplay(data);
+                })
+                .catch(error => {
+                    console.error('获取网络状态失败:', error);
+                });
+        }
+        
+        function updateStatusDisplay(data) {
+            const container = document.getElementById('status-container');
+            container.innerHTML = '';
+            
+            // 更新时间戳
+            const timestamp = new Date(data.timestamp * 1000).toLocaleString();
+            document.getElementById('timestamp').textContent = '上次更新时间: ' + timestamp;
+            
+            // 更新每个目标的状态
+            data.targets.forEach(target => {
+                const statusClass = getStatusClass(target.status);
+                const indicatorClass = getIndicatorClass(target.status);
+                
+                const card = document.createElement('div');
+                card.className = 'status-card ' + statusClass;
+                
+                const statusIndicator = `<span class="status-indicator ${indicatorClass}"></span>`;
+                
+                card.innerHTML = `
+                    <h3>${statusIndicator}${target.name} (${target.ip})</h3>
+                    <div class="status-details">
+                        <div class="status-item">
+                            <div class="status-label">状态</div>
+                            <div class="status-value">${getStatusText(target.status)}</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">响应时间</div>
+                            <div class="status-value">${target.response_time} ms</div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-label">丢包率</div>
+                            <div class="status-value">${target.loss_rate.toFixed(1)}%</div>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+        
+        function getStatusClass(status) {
+            switch(status) {
+                case 'UP': return 'status-up';
+                case 'DOWN': return 'status-down';
+                default: return 'status-unknown';
+            }
+        }
+        
+        function getIndicatorClass(status) {
+            switch(status) {
+                case 'UP': return 'indicator-up';
+                case 'DOWN': return 'indicator-down';
+                default: return 'indicator-unknown';
+            }
+        }
+        
+        function getStatusText(status) {
+            switch(status) {
+                case 'UP': return '已连接';
+                case 'DOWN': return '已断开';
+                default: return '未知';
+            }
+        }
+    </script>
+</body>
+</html>

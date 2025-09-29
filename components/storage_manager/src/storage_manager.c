@@ -846,29 +846,27 @@ static void storage_manager_monitor_callback(void* arg)
         return;
     }
     
-    // 检查存储状态
-    if (storage_device_is_card_present()) {
-        if (s_storage_ctx.state == STORAGE_STATE_UNMOUNTED) {
-            ESP_LOGI(TAG, "Card detected, attempting to mount...");
-            // 这里可以触发自动挂载
-        }
-    } else {
-        if (s_storage_ctx.state == STORAGE_STATE_MOUNTED) {
+    // 只有在已挂载状态下才进行监控检查，避免无卡时的无用检测
+    if (s_storage_ctx.state == STORAGE_STATE_MOUNTED) {
+        // 检查卡片是否仍然存在
+        if (!storage_device_is_card_present()) {
             ESP_LOGI(TAG, "Card removed");
             s_storage_ctx.state = STORAGE_STATE_UNMOUNTED;
             storage_manager_post_event(STORAGE_EVENT_CARD_REMOVED, NULL, 0);
+            return;  // 卡片移除后不再进行其他检查
+        }
+        
+        // 检查存储空间（仅在挂载状态下）
+        storage_stats_t stats;
+        if (storage_manager_get_stats(&stats) == ESP_OK) {
+            // 如果可用空间少于10%，发出警告
+            if (stats.free_bytes < (stats.total_bytes / 10)) {
+                ESP_LOGW(TAG, "Low storage space: %llu/%llu bytes", stats.free_bytes, stats.total_bytes);
+                storage_manager_post_event(STORAGE_EVENT_LOW_SPACE_WARNING, &stats, sizeof(stats));
+            }
         }
     }
-    
-    // 检查存储空间
-    storage_stats_t stats;
-    if (storage_manager_get_stats(&stats) == ESP_OK) {
-        // 如果可用空间少于10%，发出警告
-        if (stats.free_bytes < (stats.total_bytes / 10)) {
-            ESP_LOGW(TAG, "Low storage space: %llu/%llu bytes", stats.free_bytes, stats.total_bytes);
-            storage_manager_post_event(STORAGE_EVENT_LOW_SPACE_WARNING, &stats, sizeof(stats));
-        }
-    }
+    // 在UNMOUNTED状态下不进行任何检测，避免无用的尝试
 }
 
 static esp_err_t storage_manager_validate_config(const storage_config_t* config)
@@ -916,9 +914,18 @@ static esp_err_t storage_manager_process_mount_operation(const storage_operation
         storage_manager_post_event(STORAGE_EVENT_MOUNTED, NULL, 0);
         ESP_LOGI(TAG, "Storage mounted successfully");
     } else {
-        s_storage_ctx.state = STORAGE_STATE_ERROR;
-        storage_manager_post_event(STORAGE_EVENT_FILESYSTEM_ERROR, &ret, sizeof(ret));
-        ESP_LOGE(TAG, "Failed to mount storage: %s", esp_err_to_name(ret));
+        s_storage_ctx.state = STORAGE_STATE_UNMOUNTED;  // 设置为UNMOUNTED，而不是ERROR
+        
+        // 根据错误类型决定事件类型
+        if (ret == ESP_ERR_TIMEOUT) {
+            // 没有卡的情况，不发送错误事件
+            storage_manager_post_event(STORAGE_EVENT_UNMOUNTED, NULL, 0);
+            ESP_LOGD(TAG, "Storage mount skipped - no card present");  // 降级为DEBUG级别
+        } else {
+            // 其他错误才发送错误事件
+            storage_manager_post_event(STORAGE_EVENT_FILESYSTEM_ERROR, &ret, sizeof(ret));
+            ESP_LOGW(TAG, "Storage mount failed: %s", esp_err_to_name(ret));  // 降级为WARNING级别
+        }
     }
     
     return ret;
