@@ -38,7 +38,7 @@ extern "C" {
 #define CONSOLE_MAX_COMMAND_LENGTH      (256)   ///< Maximum command line length
 #define CONSOLE_MAX_ARGS                (16)    ///< Maximum number of arguments
 #define CONSOLE_MAX_ARG_LENGTH          (64)    ///< Maximum argument length
-#define CONSOLE_MAX_COMMANDS            (32)    ///< Maximum number of registered commands
+#define CONSOLE_MAX_COMMANDS            (64)    ///< Maximum number of registered commands (increased for color correction)
 #define CONSOLE_HISTORY_SIZE            (10)    ///< Command history buffer size
 #define CONSOLE_PROMPT_MAX_LENGTH       (32)    ///< Maximum prompt string length
 

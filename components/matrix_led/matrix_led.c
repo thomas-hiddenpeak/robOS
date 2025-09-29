@@ -8,6 +8,7 @@
 #include "config_manager.h"
 #include "event_manager.h"
 #include "console_core.h"
+#include "color_correction.h"
 
 #include "esp_log.h"
 #include "esp_err.h"
@@ -136,6 +137,10 @@ static void matrix_led_draw_pixel_safe(uint8_t x, uint8_t y, matrix_led_color_t 
 static void matrix_led_draw_horizontal_line(uint8_t x0, uint8_t x1, uint8_t y, matrix_led_color_t color);
 static void matrix_led_draw_vertical_line(uint8_t x, uint8_t y0, uint8_t y1, matrix_led_color_t color);
 
+// 色彩校正函数
+static esp_err_t matrix_led_apply_all_corrections(matrix_led_color_t color, uint8_t brightness, matrix_led_color_t* result);
+static void matrix_led_color_correction_changed(void);
+
 // 控制台命令函数
 static void matrix_led_register_console_commands(void);
 
@@ -196,6 +201,28 @@ esp_err_t matrix_led_init(void)
         vSemaphoreDelete(s_context.refresh_semaphore);
         vSemaphoreDelete(s_context.animation_semaphore);
         return ret;
+    }
+
+    // 初始化色彩校正系统
+    ret = color_correction_init();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to initialize color correction: %s", esp_err_to_name(ret));
+        // 色彩校正初始化失败不应该阻止整个LED矩阵的初始化
+        // 继续执行，但会记录警告
+    } else {
+        ESP_LOGI(TAG, "Color correction system initialized");
+        
+        // 注册色彩校正控制台命令
+        ret = color_correction_register_console_commands();
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to register color correction console commands: %s", esp_err_to_name(ret));
+        }
+        
+        // 注册色彩校正配置改变回调
+        ret = color_correction_register_change_callback(matrix_led_color_correction_changed);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to register color correction change callback: %s", esp_err_to_name(ret));
+        }
     }
 
     // 设置默认值
@@ -295,6 +322,12 @@ esp_err_t matrix_led_deinit(void)
 
     // 反初始化硬件
     matrix_led_deinit_hardware();
+
+    // 反初始化色彩校正系统
+    esp_err_t ret = color_correction_deinit();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to deinitialize color correction: %s", esp_err_to_name(ret));
+    }
 
     // 释放资源
     if (s_context.pixel_buffer) {
@@ -512,13 +545,13 @@ esp_err_t matrix_led_refresh(void)
         return ESP_ERR_TIMEOUT;
     }
 
-    // 应用亮度并发送到LED
+    // 应用亮度和色彩校正并发送到LED
     for (uint32_t i = 0; i < MATRIX_LED_COUNT; i++) {
-        matrix_led_color_t adjusted_color;
-        matrix_led_apply_brightness(s_context.pixel_buffer[i], s_context.brightness, &adjusted_color);
+        matrix_led_color_t corrected_color;
+        matrix_led_apply_all_corrections(s_context.pixel_buffer[i], s_context.brightness, &corrected_color);
         
         esp_err_t ret = led_strip_set_pixel(s_context.led_strip, i, 
-                                           adjusted_color.r, adjusted_color.g, adjusted_color.b);
+                                           corrected_color.r, corrected_color.g, corrected_color.b);
         if (ret != ESP_OK) {
             xSemaphoreGive(s_context.mutex);
             return ret;
@@ -1051,6 +1084,59 @@ esp_err_t matrix_led_apply_brightness(matrix_led_color_t color, uint8_t brightne
     result->b = (uint8_t)(color.b * factor);
 
     return ESP_OK;
+}
+
+/**
+ * @brief 应用亮度和色彩校正
+ */
+static esp_err_t matrix_led_apply_all_corrections(matrix_led_color_t color, uint8_t brightness, matrix_led_color_t* result)
+{
+    if (result == NULL || brightness > 100) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // 第一步：应用亮度调整
+    matrix_led_color_t brightness_adjusted;
+    esp_err_t ret = matrix_led_apply_brightness(color, brightness, &brightness_adjusted);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    // 第二步：应用色彩校正（如果已初始化并启用）
+    if (color_correction_is_enabled()) {
+        // 将matrix_led_color_t转换为color_rgb_t
+        color_rgb_t input = {
+            .r = brightness_adjusted.r,
+            .g = brightness_adjusted.g,
+            .b = brightness_adjusted.b
+        };
+        
+        color_rgb_t output;
+        ret = color_correction_apply_pixel(&input, &output);
+        if (ret == ESP_OK) {
+            result->r = output.r;
+            result->g = output.g;
+            result->b = output.b;
+        } else {
+            // 如果色彩校正失败，使用亮度调整后的结果
+            *result = brightness_adjusted;
+        }
+    } else {
+        // 色彩校正未启用，只使用亮度调整结果
+        *result = brightness_adjusted;
+    }
+
+    return ESP_OK;
+}
+
+/**
+ * @brief 色彩校正配置改变时的回调函数
+ */
+static void matrix_led_color_correction_changed(void) {
+    if (s_context.initialized && s_context.enabled) {
+        ESP_LOGI(TAG, "Color correction changed, refreshing LED matrix");
+        matrix_led_refresh();
+    }
 }
 
 // ==================== 配置管理API实现 ====================
