@@ -99,6 +99,10 @@ bootloader/
 # VS Code Extensions
 .vscode/extensions/
 
+# Language Server Cache Files
+.cache/
+*.idx
+
 # JetBrains IDEs
 *.iml
 *.ipr
