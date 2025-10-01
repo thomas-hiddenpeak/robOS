@@ -626,6 +626,8 @@ led matrix pixel 31 31 0 0 255       # 测试右下角像素
   - 静态IP配置
   - DHCP服务器功能
   - NVS配置持久化
+- 参考项目
+https://github.com/thomas-hiddenpeak/rm01-esp32s3-bsp
 
 
   ### TF卡存储功能 (SDMMC 4-bit)
