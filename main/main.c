@@ -28,6 +28,7 @@
 #include "fan_controller.h"
 #include "hardware_hal.h"
 #include "matrix_led.h"
+#include "power_monitor.h"
 #include "storage_manager.h"
 #include "touch_led.h"
 
@@ -446,7 +447,35 @@ static esp_err_t system_init(void) {
     // No need to show test pattern here as it will be restored from config
   }
 
-  // TODO: Initialize other components (Ethernet, etc.)
+  // 9. Power Monitor (voltage monitoring and power chip communication)
+  ESP_LOGI(TAG, "Initializing power monitor...");
+  power_monitor_config_t power_config;
+  ret = power_monitor_get_default_config(&power_config);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to get power monitor default config: %s", esp_err_to_name(ret));
+    // Power monitor is not critical for system boot, continue with warning
+    ESP_LOGW(TAG, "Continuing without power monitor functionality");
+  } else {
+    ret = power_monitor_init(&power_config);
+    if (ret != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to initialize power monitor: %s", esp_err_to_name(ret));
+      // Power monitor is not critical for system boot, continue with warning
+      ESP_LOGW(TAG, "Continuing without power monitor functionality");
+    } else {
+      ESP_LOGI(TAG, "Power monitor initialized (GPIO %d ADC, GPIO %d UART)", 
+               power_config.voltage_config.gpio_pin, power_config.power_chip_config.rx_gpio_pin);
+
+      // Register power monitor console commands
+      ret = power_monitor_register_console_commands();
+      if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to register power monitor commands: %s", esp_err_to_name(ret));
+      } else {
+        ESP_LOGI(TAG, "Power monitor console commands registered");
+      }
+    }
+  }
+
+  // TODO: Initialize other components if needed
 
   ESP_LOGI(TAG, "robOS system initialization completed");
   return ret;
