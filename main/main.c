@@ -452,23 +452,27 @@ static esp_err_t system_init(void) {
   power_monitor_config_t power_config;
   ret = power_monitor_get_default_config(&power_config);
   if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to get power monitor default config: %s", esp_err_to_name(ret));
+    ESP_LOGE(TAG, "Failed to get power monitor default config: %s",
+             esp_err_to_name(ret));
     // Power monitor is not critical for system boot, continue with warning
     ESP_LOGW(TAG, "Continuing without power monitor functionality");
   } else {
     ret = power_monitor_init(&power_config);
     if (ret != ESP_OK) {
-      ESP_LOGE(TAG, "Failed to initialize power monitor: %s", esp_err_to_name(ret));
+      ESP_LOGE(TAG, "Failed to initialize power monitor: %s",
+               esp_err_to_name(ret));
       // Power monitor is not critical for system boot, continue with warning
       ESP_LOGW(TAG, "Continuing without power monitor functionality");
     } else {
-      ESP_LOGI(TAG, "Power monitor initialized (GPIO %d ADC, GPIO %d UART)", 
-               power_config.voltage_config.gpio_pin, power_config.power_chip_config.rx_gpio_pin);
+      ESP_LOGI(TAG, "Power monitor initialized (GPIO %d ADC, GPIO %d UART)",
+               power_config.voltage_config.gpio_pin,
+               power_config.power_chip_config.rx_gpio_pin);
 
       // Register power monitor console commands
       ret = power_monitor_register_console_commands();
       if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to register power monitor commands: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "Failed to register power monitor commands: %s",
+                 esp_err_to_name(ret));
       } else {
         ESP_LOGI(TAG, "Power monitor console commands registered");
       }
