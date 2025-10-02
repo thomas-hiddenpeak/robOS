@@ -49,7 +49,7 @@ extern "C" {
 /**
  * @brief Power chip data packet size
  */
-#define POWER_CHIP_PACKET_SIZE 8
+#define POWER_CHIP_PACKET_SIZE 4
 
 /**
  * @brief Power chip header byte
