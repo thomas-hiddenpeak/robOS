@@ -41,7 +41,7 @@ extern "C" {
  */
 
 #define ETHERNET_MANAGER_DEFAULT_IP "10.10.99.97"
-#define ETHERNET_MANAGER_DEFAULT_GATEWAY "10.10.99.100"
+#define ETHERNET_MANAGER_DEFAULT_GATEWAY "10.10.99.1"
 #define ETHERNET_MANAGER_DEFAULT_NETMASK "255.255.255.0"
 #define ETHERNET_MANAGER_DEFAULT_DNS "8.8.8.8"
 
@@ -254,6 +254,66 @@ ethernet_manager_set_dhcp_config(const ethernet_dhcp_config_t *config);
 esp_err_t ethernet_manager_get_dhcp_config(ethernet_dhcp_config_t *config);
 
 /* ============================================================================
+ * Individual Parameter Configuration Functions
+ * ============================================================================
+ */
+
+/**
+ * @brief Set IP address
+ */
+esp_err_t ethernet_manager_set_ip_address(const char *ip_addr);
+
+/**
+ * @brief Set network mask
+ */
+esp_err_t ethernet_manager_set_netmask(const char *netmask);
+
+/**
+ * @brief Set gateway address
+ */
+esp_err_t ethernet_manager_set_gateway(const char *gateway);
+
+/**
+ * @brief Set DNS server address
+ */
+esp_err_t ethernet_manager_set_dns_server(const char *dns_server);
+
+/**
+ * @brief Set DHCP pool start address
+ */
+esp_err_t ethernet_manager_set_dhcp_pool_start(const char *pool_start);
+
+/**
+ * @brief Set DHCP pool end address
+ */
+esp_err_t ethernet_manager_set_dhcp_pool_end(const char *pool_end);
+
+/**
+ * @brief Set DHCP lease time in hours
+ */
+esp_err_t ethernet_manager_set_dhcp_lease_time(uint32_t hours);
+
+/**
+ * @brief Set maximum DHCP clients
+ */
+esp_err_t ethernet_manager_set_dhcp_max_clients(uint8_t max_clients);
+
+/**
+ * @brief Save configuration to NVS
+ */
+esp_err_t ethernet_manager_save_config(void);
+
+/**
+ * @brief Load configuration from NVS
+ */
+esp_err_t ethernet_manager_load_config(void);
+
+/**
+ * @brief Reset configuration to defaults
+ */
+esp_err_t ethernet_manager_reset_config(void);
+
+/* ============================================================================
  * Network Control Functions
  * ============================================================================
  */
@@ -293,6 +353,18 @@ esp_err_t ethernet_manager_dhcp_server_start(void);
  * @return ESP_OK on success, error code otherwise
  */
 esp_err_t ethernet_manager_dhcp_server_stop(void);
+
+/**
+ * @brief Get network activity log
+ *
+ * @param entries Buffer to store log entries (caller allocated)
+ * @param max_entries Maximum number of entries to retrieve
+ * @param total_entries Pointer to store total number of entries available
+ * @return Number of entries actually retrieved
+ */
+uint32_t ethernet_manager_get_activity_log(char entries[][128],
+                                           uint32_t max_entries,
+                                           uint32_t *total_entries);
 
 /* ============================================================================
  * Event System Integration
