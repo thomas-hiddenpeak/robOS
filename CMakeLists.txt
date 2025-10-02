@@ -9,3 +9,5 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 # Define the project
 project(${PROJECT_NAME})
+
+# LWIP ARP table configuration will be handled through ARP cleanup mechanisms in code

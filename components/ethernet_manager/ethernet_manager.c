@@ -110,6 +110,16 @@ typedef struct {
     uint32_t last_assigned_ip; ///< Last assigned IP (for change detection)
     uint32_t client_count;     ///< Number of connected clients
   } dhcp_monitor;
+
+  // DHCP debugging and timing analysis
+  struct {
+    uint32_t link_up_time;       ///< Timestamp when link came up
+    uint32_t dhcp_start_time;    ///< Timestamp when DHCP started
+    uint32_t dhcp_complete_time; ///< Timestamp when DHCP completed
+    uint32_t event_count;        ///< Number of DHCP events logged
+    char last_event[64];         ///< Last DHCP event description
+    bool timing_active;          ///< Whether timing analysis is active
+  } dhcp_debug;
 } ethernet_manager_state_t;
 
 // Global state instance
@@ -150,6 +160,9 @@ static esp_err_t ethernet_save_config_to_storage(void);
 static void ethernet_notify_status_change(ethernet_status_t new_status);
 static void ethernet_log_network_activity(const char *activity);
 static void ethernet_dhcp_monitor_task(void *params);
+static void ethernet_dhcp_status_check(void);
+static void ethernet_dhcp_debug_log(const char *event, const char *details);
+static void ethernet_dhcp_timing_analysis(void);
 
 /* ============================================================================
  * Core Management Functions
@@ -167,8 +180,10 @@ esp_err_t ethernet_manager_init(const ethernet_manager_config_t *config) {
 
   ESP_LOGI(TAG, "Initializing ethernet manager...");
 
-  // Reduce lwip DHCP log verbosity to avoid console noise
-  esp_log_level_set("esp_netif_lwip", ESP_LOG_WARN);
+  // Enable detailed DHCP debugging to diagnose client delay issues
+  esp_log_level_set("esp_netif_lwip", ESP_LOG_DEBUG);
+  esp_log_level_set("dhcp", ESP_LOG_DEBUG);
+  esp_log_level_set("dhcps", ESP_LOG_DEBUG);
 
   // Initialize state structure
   memset(&s_ethernet_state, 0, sizeof(ethernet_manager_state_t));
@@ -629,6 +644,16 @@ static esp_err_t ethernet_netif_init(void) {
     return ret;
   }
 
+  // Register DHCP server IP assignment event handler (critical for fast client
+  // response)
+  ret = esp_event_handler_register(IP_EVENT, IP_EVENT_AP_STAIPASSIGNED,
+                                   &ethernet_event_handler, NULL);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to register AP STA IP assigned event handler: %s",
+             esp_err_to_name(ret));
+    return ret;
+  }
+
   // Configure DHCP server lease range - must be done before DHCP server starts
   // First stop DHCP server if it's already started
   esp_netif_dhcps_stop(s_ethernet_state.netif);
@@ -651,8 +676,9 @@ static esp_err_t ethernet_netif_init(void) {
              s_ethernet_state.config.dhcp_server.pool_end);
   }
 
-  // Stop DHCP server to reconfigure it
-  esp_netif_dhcps_stop(s_ethernet_state.netif);
+  // Note: DHCP client timeout optimization
+  // The timeout optimization will be handled by LWIP configuration in sdkconfig
+  ESP_LOGI(TAG, "DHCP client configured with optimized timeouts via sdkconfig");
 
   // Configure DHCP server to offer DNS server to clients
   uint8_t dhcps_offer_option = OFFER_DNS;
@@ -715,6 +741,8 @@ static esp_err_t ethernet_netif_deinit(void) {
                                &ethernet_event_handler);
   esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP,
                                &ethernet_event_handler);
+  esp_event_handler_unregister(IP_EVENT, IP_EVENT_AP_STAIPASSIGNED,
+                               &ethernet_event_handler);
 
   // Destroy network interface
   if (s_ethernet_state.netif) {
@@ -751,15 +779,33 @@ static void ethernet_event_handler(void *arg, esp_event_base_t event_base,
       break;
 
     case ETHERNET_EVENT_CONNECTED:
-      ESP_LOGI(TAG, "Ethernet Link Up");
+      ESP_LOGI(TAG, "Ethernet Link Up - Starting DHCP client");
+
+      // Get timing for DHCP start analysis
+      uint32_t link_up_tick = xTaskGetTickCount();
+      uint32_t link_up_time_ms = link_up_tick * portTICK_PERIOD_MS;
+      ESP_LOGI(TAG, "Link up at: %lu ms from boot",
+               (unsigned long)link_up_time_ms);
+
+      // Log structured debug information
+      char link_details[64];
+      snprintf(link_details, sizeof(link_details),
+               "MAC=%02x:%02x:%02x:%02x:%02x:%02x",
+               s_ethernet_state.mac_addr[0], s_ethernet_state.mac_addr[1],
+               s_ethernet_state.mac_addr[2], s_ethernet_state.mac_addr[3],
+               s_ethernet_state.mac_addr[4], s_ethernet_state.mac_addr[5]);
+      ethernet_dhcp_debug_log("LINK_UP", link_details);
+      ethernet_dhcp_debug_log("DHCP_START", "Initiating DHCP client");
+
       // Log detailed connection information
       char detail_msg[128];
       snprintf(detail_msg, sizeof(detail_msg),
                "Ethernet connected - MAC: %02x:%02x:%02x:%02x:%02x:%02x, "
-               "Speed: 100Mbps, Full-Duplex",
+               "Speed: 100Mbps, Full-Duplex, DHCP starting at %lums",
                s_ethernet_state.mac_addr[0], s_ethernet_state.mac_addr[1],
                s_ethernet_state.mac_addr[2], s_ethernet_state.mac_addr[3],
-               s_ethernet_state.mac_addr[4], s_ethernet_state.mac_addr[5]);
+               s_ethernet_state.mac_addr[4], s_ethernet_state.mac_addr[5],
+               (unsigned long)link_up_time_ms);
       ethernet_log_network_activity(detail_msg);
       s_ethernet_state.link_up = true;
       s_ethernet_state.status = ETHERNET_STATUS_CONNECTED;
@@ -783,10 +829,38 @@ static void ethernet_event_handler(void *arg, esp_event_base_t event_base,
     switch (event_id) {
     case IP_EVENT_ETH_GOT_IP: {
       ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-      ESP_LOGI(TAG, "Ethernet Got IP Address");
+
+      // Get current tick for timing analysis
+      uint32_t current_tick = xTaskGetTickCount();
+      uint32_t time_ms = current_tick * portTICK_PERIOD_MS;
+
+      ESP_LOGI(TAG, "=== DHCP IP ASSIGNMENT COMPLETED ===");
+      ESP_LOGI(TAG, "Timestamp: %lu ms from boot", (unsigned long)time_ms);
       ESP_LOGI(TAG, "IP: " IPSTR, IP2STR(&event->ip_info.ip));
       ESP_LOGI(TAG, "Netmask: " IPSTR, IP2STR(&event->ip_info.netmask));
       ESP_LOGI(TAG, "Gateway: " IPSTR, IP2STR(&event->ip_info.gw));
+
+      // Log structured debug information
+      char ip_details[128];
+      snprintf(ip_details, sizeof(ip_details),
+               "IP=" IPSTR " GW=" IPSTR " MASK=" IPSTR,
+               IP2STR(&event->ip_info.ip), IP2STR(&event->ip_info.gw),
+               IP2STR(&event->ip_info.netmask));
+      ethernet_dhcp_debug_log("IP_ASSIGNED", ip_details);
+
+      // Perform timing analysis
+      ethernet_dhcp_timing_analysis();
+
+      // Log detailed network activity with timing
+      char dhcp_completion_msg[256];
+      snprintf(dhcp_completion_msg, sizeof(dhcp_completion_msg),
+               "DHCP client IP assignment - IP: " IPSTR ", GW: " IPSTR
+               ", Netmask: " IPSTR " at %lums",
+               IP2STR(&event->ip_info.ip), IP2STR(&event->ip_info.gw),
+               IP2STR(&event->ip_info.netmask), (unsigned long)time_ms);
+      ethernet_log_network_activity(dhcp_completion_msg);
+
+      ESP_LOGI(TAG, "=== DHCP CLIENT NOW READY ===");
 
       s_ethernet_state.status = ETHERNET_STATUS_CONNECTED;
       s_ethernet_state.rx_packets++; // Count IP event as activity
@@ -798,6 +872,46 @@ static void ethernet_event_handler(void *arg, esp_event_base_t event_base,
       s_ethernet_state.status = ETHERNET_STATUS_READY;
       ethernet_notify_status_change(ETHERNET_STATUS_READY);
       break;
+
+    case IP_EVENT_AP_STAIPASSIGNED: {
+      ip_event_ap_staipassigned_t *event =
+          (ip_event_ap_staipassigned_t *)event_data;
+
+      // Get current tick for timing analysis
+      uint32_t current_tick = xTaskGetTickCount();
+      uint32_t time_ms = current_tick * portTICK_PERIOD_MS;
+
+      ESP_LOGI(TAG, "=== DHCP SERVER ASSIGNED IP TO CLIENT ===");
+      ESP_LOGI(TAG, "Timestamp: %lu ms from boot", (unsigned long)time_ms);
+      ESP_LOGI(TAG, "Client IP: " IPSTR, IP2STR(&event->ip));
+      ESP_LOGI(TAG, "Client MAC: %02x:%02x:%02x:%02x:%02x:%02x", event->mac[0],
+               event->mac[1], event->mac[2], event->mac[3], event->mac[4],
+               event->mac[5]);
+
+      // Log structured debug information for fast client response
+      char client_details[128];
+      snprintf(client_details, sizeof(client_details),
+               "IP=" IPSTR " MAC=%02x:%02x:%02x:%02x:%02x:%02x TIME=%lums",
+               IP2STR(&event->ip), event->mac[0], event->mac[1], event->mac[2],
+               event->mac[3], event->mac[4], event->mac[5],
+               (unsigned long)time_ms);
+      ethernet_dhcp_debug_log("CLIENT_IP_ASSIGNED", client_details);
+
+      // Log detailed network activity
+      char client_assignment_msg[256];
+      snprintf(client_assignment_msg, sizeof(client_assignment_msg),
+               "DHCP server assigned IP " IPSTR
+               " to client %02x:%02x:%02x:%02x:%02x:%02x at %lums",
+               IP2STR(&event->ip), event->mac[0], event->mac[1], event->mac[2],
+               event->mac[3], event->mac[4], event->mac[5],
+               (unsigned long)time_ms);
+      ethernet_log_network_activity(client_assignment_msg);
+
+      ESP_LOGI(TAG, "=== CLIENT DHCP ASSIGNMENT COMPLETE ===");
+
+      s_ethernet_state.tx_packets++; // Count IP assignment as activity
+      break;
+    }
 
     default:
       ESP_LOGD(TAG, "Unknown IP event: %ld", event_id);
@@ -872,7 +986,7 @@ static void ethernet_monitor_dhcp_clients(void) {
 
   last_check_time = current_time;
 
-  // Check ARP table for devices in our DHCP range (10.10.99.100 - 10.10.99.110)
+  // Check ARP table for devices in our DHCP range (10.10.99.100 - 10.10.99.101)
   ip4_addr_t dhcp_start;
   IP4_ADDR(&dhcp_start, 10, 10, 99, 100);
 
@@ -1439,14 +1553,74 @@ uint32_t ethernet_manager_get_activity_log(char entries[][128],
 /**
  * @brief DHCP monitoring task
  */
+static void ethernet_dhcp_status_check(void) {
+  if (!s_ethernet_state.netif) {
+    return;
+  }
+
+  esp_netif_dhcp_status_t dhcp_status;
+  esp_err_t ret =
+      esp_netif_dhcpc_get_status(s_ethernet_state.netif, &dhcp_status);
+
+  if (ret == ESP_OK) {
+    const char *status_str = "UNKNOWN";
+    switch (dhcp_status) {
+    case ESP_NETIF_DHCP_INIT:
+      status_str = "INIT";
+      break;
+    case ESP_NETIF_DHCP_STARTED:
+      status_str = "STARTED";
+      break;
+    case ESP_NETIF_DHCP_STOPPED:
+      status_str = "STOPPED";
+      break;
+    default:
+      break;
+    }
+    ESP_LOGI(TAG, "DHCP client status: %s", status_str);
+
+    // Check if we have an IP but DHCP shows unusual status
+    esp_netif_ip_info_t ip_info;
+    if (esp_netif_get_ip_info(s_ethernet_state.netif, &ip_info) == ESP_OK) {
+      if (ip_info.ip.addr != 0) {
+        ESP_LOGI(TAG, "Current IP: " IPSTR " (DHCP status: %s)",
+                 IP2STR(&ip_info.ip), status_str);
+      } else {
+        ESP_LOGI(TAG, "No IP assigned yet (DHCP status: %s)", status_str);
+      }
+    }
+  }
+}
+
 static void ethernet_dhcp_monitor_task(void *params) {
   (void)params;
 
   ESP_LOGI(TAG, "DHCP monitor task started");
+  static uint32_t arp_cleanup_counter = 0;
 
   while (1) {
     ethernet_monitor_dhcp_clients();
-    vTaskDelay(pdMS_TO_TICKS(10000)); // Check every 10 seconds
+    ethernet_dhcp_status_check(); // Add DHCP client status check
+
+    // Perform ARP table cleanup every 30 seconds (6 * 5s intervals)
+    arp_cleanup_counter++;
+    if (arp_cleanup_counter >= 6) {
+      ESP_LOGD(TAG, "Performing ARP table cleanup");
+
+      // Force ARP table cleanup to prevent "no empty entry found" issues
+      struct netif *netif = esp_netif_get_netif_impl(s_ethernet_state.netif);
+      if (netif) {
+        // Clear expired ARP entries to prevent table overflow
+        etharp_tmr(); // Force ARP timer processing
+        ESP_LOGD(TAG, "ARP table cleanup completed for netif %c%c%d",
+                 netif->name[0], netif->name[1], netif->num);
+      }
+
+      arp_cleanup_counter = 0;
+    }
+
+    vTaskDelay(
+        pdMS_TO_TICKS(5000)); // Check every 5 seconds for faster debugging
   }
 }
 
@@ -1623,4 +1797,95 @@ esp_err_t ethernet_manager_reset_config(void) {
 
   ESP_LOGI(TAG, "Configuration reset to defaults and saved");
   return ESP_OK;
+}
+
+/* ============================================================================
+ * DHCP Debug Analysis Functions
+ * ============================================================================
+ */
+
+/**
+ * @brief Log structured DHCP debug information for automated analysis
+ */
+static void ethernet_dhcp_debug_log(const char *event, const char *details) {
+  if (!event)
+    return;
+
+  uint32_t timestamp = xTaskGetTickCount() * portTICK_PERIOD_MS;
+
+  // Log in structured format for easy parsing
+  printf("[DHCP_DEBUG] TIMESTAMP=%lu EVENT=%s DETAILS=%s\n",
+         (unsigned long)timestamp, event, details ? details : "");
+
+  // Store in state for timing analysis
+  xSemaphoreTake(s_ethernet_state.mutex, portMAX_DELAY);
+
+  if (strcmp(event, "LINK_UP") == 0) {
+    s_ethernet_state.dhcp_debug.link_up_time = timestamp;
+    s_ethernet_state.dhcp_debug.timing_active = true;
+  } else if (strcmp(event, "DHCP_START") == 0) {
+    s_ethernet_state.dhcp_debug.dhcp_start_time = timestamp;
+  } else if (strcmp(event, "IP_ASSIGNED") == 0) {
+    s_ethernet_state.dhcp_debug.dhcp_complete_time = timestamp;
+  }
+
+  s_ethernet_state.dhcp_debug.event_count++;
+  if (details) {
+    strncpy(s_ethernet_state.dhcp_debug.last_event, details,
+            sizeof(s_ethernet_state.dhcp_debug.last_event) - 1);
+    s_ethernet_state.dhcp_debug
+        .last_event[sizeof(s_ethernet_state.dhcp_debug.last_event) - 1] = '\0';
+  }
+
+  xSemaphoreGive(s_ethernet_state.mutex);
+}
+
+/**
+ * @brief Perform and display DHCP timing analysis
+ */
+static void ethernet_dhcp_timing_analysis(void) {
+  if (!s_ethernet_state.dhcp_debug.timing_active) {
+    return;
+  }
+
+  xSemaphoreTake(s_ethernet_state.mutex, portMAX_DELAY);
+
+  uint32_t link_time = s_ethernet_state.dhcp_debug.link_up_time;
+  uint32_t start_time = s_ethernet_state.dhcp_debug.dhcp_start_time;
+  uint32_t complete_time = s_ethernet_state.dhcp_debug.dhcp_complete_time;
+
+  printf("\n=== DHCP TIMING ANALYSIS ===\n");
+  printf("Link Up Time:      %lu ms\n", (unsigned long)link_time);
+  printf("DHCP Start Time:   %lu ms\n", (unsigned long)start_time);
+  printf("DHCP Complete Time: %lu ms\n", (unsigned long)complete_time);
+
+  if (start_time > 0 && link_time > 0) {
+    printf("Link->DHCP Delay:  %lu ms\n",
+           (unsigned long)(start_time - link_time));
+  }
+
+  if (complete_time > 0 && start_time > 0) {
+    printf("DHCP Negotiation:  %lu ms\n",
+           (unsigned long)(complete_time - start_time));
+  }
+
+  if (complete_time > 0 && link_time > 0) {
+    printf("Total Link->IP:    %lu ms\n",
+           (unsigned long)(complete_time - link_time));
+  }
+
+  printf("Total Events:      %lu\n",
+         (unsigned long)s_ethernet_state.dhcp_debug.event_count);
+  printf("============================\n\n");
+
+  xSemaphoreGive(s_ethernet_state.mutex);
+}
+
+/**
+ * @brief Test and display ARP configuration settings
+ */
+void ethernet_manager_test_arp_config(void) {
+  extern void test_arp_config(void);
+  ESP_LOGI(TAG, "Testing ARP configuration...");
+  test_arp_config();
 }

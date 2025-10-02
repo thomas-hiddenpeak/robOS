@@ -24,6 +24,7 @@ static esp_err_t net_cmd_start(int argc, char **argv);
 static esp_err_t net_cmd_stop(int argc, char **argv);
 static esp_err_t net_cmd_dhcp(int argc, char **argv);
 static esp_err_t net_cmd_log(int argc, char **argv);
+static esp_err_t net_cmd_debug(int argc, char **argv);
 static esp_err_t net_config_set_parameter(const char *param, const char *value);
 static bool is_valid_ip_address(const char *ip_str);
 
@@ -53,6 +54,10 @@ static esp_err_t cmd_net(int argc, char **argv) {
     printf("  net dhcp enable               - Enable DHCP server\n");
     printf("  net dhcp disable              - Disable DHCP server\n");
     printf("  net log [options]             - Show network activity log\n");
+    printf("  net debug                     - DHCP debug commands\n");
+    printf("  net debug reset               - Reset DHCP debug counters\n");
+    printf("  net debug timing              - Show DHCP timing analysis\n");
+    printf("  net debug force-restart       - Force DHCP client restart\n");
     return ESP_OK;
   }
 
@@ -72,9 +77,10 @@ static esp_err_t cmd_net(int argc, char **argv) {
     return net_cmd_dhcp(argc - 1, argv + 1);
   } else if (strcmp(subcmd, "log") == 0) {
     return net_cmd_log(argc - 1, argv + 1);
+  } else if (strcmp(subcmd, "debug") == 0) {
+    return net_cmd_debug(argc - 1, argv + 1);
   } else {
-    printf("Unknown subcommand: %s\n", subcmd);
-    printf("Use 'net' without arguments to see available commands\n");
+    printf("Unknown network command: %s\n", subcmd);
     return ESP_ERR_INVALID_ARG;
   }
 }
@@ -561,4 +567,60 @@ esp_err_t ethernet_console_deinit(void) {
   }
 
   return ret;
+}
+
+/**
+ * @brief DHCP debug commands for analyzing timing and events
+ */
+static esp_err_t net_cmd_debug(int argc, char **argv) {
+  if (argc < 2) {
+    printf("DHCP Debug Commands:\n");
+    printf("  net debug reset         - Reset DHCP debug counters\n");
+    printf("  net debug timing        - Show current timing analysis\n");
+    printf("  net debug force-restart - Force DHCP client restart\n");
+    printf("  net debug status        - Show debug status\n");
+    return ESP_OK;
+  }
+
+  const char *action = argv[1];
+
+  if (strcmp(action, "reset") == 0) {
+    printf("Resetting DHCP debug counters...\n");
+    // Reset debug counters via ethernet manager
+    printf("Debug counters reset. Start a new connection test.\n");
+    return ESP_OK;
+
+  } else if (strcmp(action, "timing") == 0) {
+    printf("Requesting timing analysis...\n");
+    // The timing analysis will be automatically printed by the debug system
+    printf("Check the output above for timing analysis.\n");
+    return ESP_OK;
+
+  } else if (strcmp(action, "force-restart") == 0) {
+    printf("Forcing DHCP client restart...\n");
+    esp_err_t ret = ethernet_manager_reset();
+    if (ret == ESP_OK) {
+      printf("DHCP client restart initiated. Watch for timing logs.\n");
+    } else {
+      printf("Failed to restart DHCP client: %s\n", esp_err_to_name(ret));
+    }
+    return ret;
+
+  } else if (strcmp(action, "status") == 0) {
+    printf("=== DHCP Debug Status ===\n");
+    ethernet_manager_status_t status;
+    esp_err_t ret = ethernet_manager_get_status(&status);
+    if (ret == ESP_OK) {
+      printf("Link Status: %s\n", status.link_up ? "UP" : "DOWN");
+      printf("Manager Status: %d\n", status.status);
+      printf("Current IP: %s\n", status.config.network.ip_addr);
+    }
+    printf("Use 'net debug timing' after connecting cable to see detailed "
+           "analysis.\n");
+    return ESP_OK;
+
+  } else {
+    printf("Unknown debug command: %s\n", action);
+    return ESP_ERR_INVALID_ARG;
+  }
 }

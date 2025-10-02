@@ -46,7 +46,7 @@ extern "C" {
 #define ETHERNET_MANAGER_DEFAULT_DNS "8.8.8.8"
 
 #define ETHERNET_MANAGER_DHCP_POOL_START "10.10.99.100"
-#define ETHERNET_MANAGER_DHCP_POOL_END "10.10.99.110"
+#define ETHERNET_MANAGER_DHCP_POOL_END "10.10.99.101"
 #define ETHERNET_MANAGER_DHCP_LEASE_TIME 24 // hours
 
 /* ============================================================================
@@ -150,12 +150,12 @@ typedef void (*ethernet_event_callback_t)(ethernet_status_t status,
  * @brief Default DHCP server configuration
  */
 #define ETHERNET_DEFAULT_DHCP_CONFIG()                                         \
-  {.enable = false,                                                            \
+  {.enable = true,                                                             \
    .pool_start = ETHERNET_MANAGER_DHCP_POOL_START,                             \
    .pool_end = ETHERNET_MANAGER_DHCP_POOL_END,                                 \
    .lease_time_hours = ETHERNET_MANAGER_DHCP_LEASE_TIME,                       \
    .max_clients = 10,                                                          \
-   .auto_start = false}
+   .auto_start = true}
 
 /**
  * @brief Default ethernet manager configuration
@@ -404,6 +404,12 @@ esp_err_t ethernet_manager_register_console_commands(void);
  * @return ESP_OK on success, error code otherwise
  */
 esp_err_t ethernet_manager_unregister_console_commands(void);
+
+/**
+ * @brief Test and display ARP configuration settings
+ * This function is used for debugging ARP table issues
+ */
+void ethernet_manager_test_arp_config(void);
 
 #ifdef __cplusplus
 }
