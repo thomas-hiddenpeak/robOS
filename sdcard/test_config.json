@@ -1,0 +1,39 @@
+{
+  "format_version": "1.0",
+  "export_time": "2025-10-03T10:30:00Z",
+  "device_id": "robOS_test",
+  "configuration": {
+    "led_matrix": {
+      "brightness": {
+        "type": "uint8",
+        "value": 128
+      },
+      "mode": {
+        "type": "string",
+        "value": "animation"
+      },
+      "fps": {
+        "type": "uint16", 
+        "value": 30
+      },
+      "enabled": {
+        "type": "bool",
+        "value": true
+      }
+    },
+    "fan_controller": {
+      "pwm_pin": {
+        "type": "uint8",
+        "value": 25
+      },
+      "speed": {
+        "type": "float",
+        "value": 75.5
+      },
+      "auto_mode": {
+        "type": "bool",
+        "value": false
+      }
+    }
+  }
+}
