@@ -23,14 +23,18 @@
 #include "board_led.h"
 #include "config_manager.h"
 #include "console_core.h"
+#include "device_controller.h"
 #include "ethernet_manager.h"
 #include "event_manager.h"
 #include "fan_controller.h"
+#include "gpio_controller.h"
+#include "hardware_commands.h"
 #include "hardware_hal.h"
 #include "matrix_led.h"
 #include "power_monitor.h"
 #include "storage_manager.h"
 #include "touch_led.h"
+#include "usb_mux_controller.h"
 
 static const char *TAG = "ROBOS_MAIN";
 
@@ -225,6 +229,33 @@ static esp_err_t system_init(void) {
   }
   ESP_LOGI(TAG, "Hardware HAL initialized");
 
+  // 2.1. GPIO Controller (general GPIO operations)
+  ret = gpio_controller_init();
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to initialize GPIO controller: %s",
+             esp_err_to_name(ret));
+    return ret;
+  }
+  ESP_LOGI(TAG, "GPIO controller initialized");
+
+  // 2.2. USB MUX Controller (USB-C interface switching)
+  ret = usb_mux_controller_init();
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to initialize USB MUX controller: %s",
+             esp_err_to_name(ret));
+    return ret;
+  }
+  ESP_LOGI(TAG, "USB MUX controller initialized");
+
+  // 2.3. Device Controller (AGX and LPMU device management)
+  ret = device_controller_init();
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to initialize device controller: %s",
+             esp_err_to_name(ret));
+    return ret;
+  }
+  ESP_LOGI(TAG, "Device controller initialized");
+
   // 3. Console Core (user interface)
   console_config_t console_config = console_get_default_config();
   ret = console_core_init(&console_config);
@@ -242,6 +273,15 @@ static esp_err_t system_init(void) {
     return ret;
   }
   ESP_LOGI(TAG, "Console core started");
+
+  // 3.1. Hardware Commands (GPIO and USB MUX console commands)
+  ret = hardware_commands_init();
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to initialize hardware commands: %s",
+             esp_err_to_name(ret));
+    return ret;
+  }
+  ESP_LOGI(TAG, "Hardware commands initialized and registered");
 
   // 4. Configuration Manager (unified config storage)
   config_manager_config_t config_mgr_config =

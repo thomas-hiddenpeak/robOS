@@ -36,6 +36,9 @@ robOS/
 ├── components/                    # 独立功能组件
 │   ├── console_core/             # 控制台核心组件
 │   ├── hardware_hal/             # 硬件抽象层组件
+│   ├── gpio_controller/          # GPIO通用控制组件 ⚡
+│   ├── usb_mux_controller/       # USB MUX切换控制组件 ⚡
+│   ├── hardware_commands/        # 硬件控制台命令组件 ⚡
 │   ├── config_manager/           # 配置管理组件
 │   ├── fan_controller/           # 风扇控制组件
 │   ├── touch_led/                # 触摸LED控制组件 ✨
@@ -53,6 +56,9 @@ robOS/
 ### 组件职责
 - **console_core**: UART接口、命令解析器、帮助系统
 - **hardware_hal**: GPIO、PWM、SPI、ADC、UART等底层接口抽象
+- **gpio_controller**: ⚡ 通用GPIO控制、安全操作、引脚管理
+- **usb_mux_controller**: ⚡ USB-C接口切换、ESP32S3/AGX/N305目标管理
+- **hardware_commands**: ⚡ GPIO和USB MUX控制台命令接口
 - **config_manager**: 统一NVS配置管理、多数据类型支持、自动提交
 - **fan_controller**: PWM风扇控制、温度曲线、多模式运行、配置持久化
 - **matrix_led**: 32x32 WS2812 LED矩阵控制，像素绘图、动画播放、亮度调节
@@ -77,6 +83,16 @@ robOS/
 
 
 ## 主要功能
+
+### GPIO通用控制 ⚡
+- **支持引脚**: ESP32S3所有可用GPIO引脚（0-21, 26, 33-48）
+- **安全操作**: 避免输出状态干扰的设计
+- **控制模式**:
+  - **输出控制**: 设置GPIO高/低电平输出
+  - **输入读取**: 安全的输入模式切换和状态读取
+  - **引脚验证**: 自动验证引脚可用性
+- **控制台命令**: `gpio <pin> high|low|input`
+- **线程安全**: 支持多线程环境下的安全操作
 
 ### 风扇控制功能
 - **PWM引脚**: GPIO 41 - 风扇PWM控制信号
