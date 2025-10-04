@@ -1,0 +1,169 @@
+name: Build ESP32S3 Firmware
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # 允许手动触发
+
+env:
+  IDF_VERSION: 'v5.1.4'  # 指定ESP-IDF版本
+  PROJECT_NAME: 'robOS'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Install ESP-IDF
+      uses: espressif/esp-idf-ci-action@v1
+      with:
+        esp_idf_version: ${{ env.IDF_VERSION }}
+        target: esp32s3
+    
+    - name: Cache ESP-IDF and components
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.espressif
+          build/managed_components
+        key: ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-${{ hashFiles('**/idf_component.yml', '**/CMakeLists.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-
+    
+    - name: Configure ESP-IDF
+      run: |
+        . $IDF_PATH/export.sh
+        idf.py set-target esp32s3
+        
+    - name: Build firmware
+      run: |
+        . $IDF_PATH/export.sh
+        idf.py build
+        
+    - name: Generate build info
+      run: |
+        echo "Build Information:" > build_info.txt
+        echo "==================" >> build_info.txt
+        echo "Project: ${{ env.PROJECT_NAME }}" >> build_info.txt
+        echo "Target: ESP32S3" >> build_info.txt
+        echo "ESP-IDF Version: ${{ env.IDF_VERSION }}" >> build_info.txt
+        echo "Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> build_info.txt
+        echo "Git Commit: ${{ github.sha }}" >> build_info.txt
+        echo "Git Branch: ${{ github.ref_name }}" >> build_info.txt
+        echo "" >> build_info.txt
+        echo "Flash Command:" >> build_info.txt
+        echo "esptool.py --chip esp32s3 --port /dev/ttyUSB0 --baud 460800 write_flash @build/flash_args" >> build_info.txt
+        echo "" >> build_info.txt
+        echo "Files in this build:" >> build_info.txt
+        echo "===================" >> build_info.txt
+        ls -la build/*.bin build/*.elf 2>/dev/null | while read line; do
+          echo "$line" >> build_info.txt
+        done || echo "No binary files found" >> build_info.txt
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: esp32s3-firmware-${{ github.run_number }}
+        path: |
+          build/*.bin
+          build/*.elf
+          build/*.map
+          build/flash_args
+          build/partition_table/partition-table.bin
+          build/bootloader/bootloader.bin
+          build_info.txt
+        retention-days: 30
+        
+    - name: Upload flashable package
+      uses: actions/upload-artifact@v4
+      with:
+        name: esp32s3-flash-package-${{ github.run_number }}
+        path: |
+          build/robOS.bin
+          build/flash_args
+          build/partition_table/partition-table.bin
+          build/bootloader/bootloader.bin
+          flash_standalone.sh
+          FLASH_README.md
+          build_info.txt
+        retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: esp32s3-flash-package-${{ github.run_number }}
+        path: ./release-files
+        
+    - name: Create release package
+      run: |
+        cd release-files
+        zip -r ../robOS-esp32s3-${{ github.ref_name }}.zip .
+        cd ..
+        
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: robOS ${{ github.ref_name }}
+        body: |
+          ## robOS ESP32S3 Firmware ${{ github.ref_name }}
+          
+          ### 🚀 Quick Flash Instructions
+          
+          1. Download the `robOS-esp32s3-${{ github.ref_name }}.zip` file
+          2. Extract the zip file
+          3. Connect your ESP32S3 device
+          4. Run the flash script:
+             ```bash
+             chmod +x flash_standalone.sh
+             ./flash_standalone.sh
+             ```
+          
+          For detailed instructions, see `FLASH_README.md` in the package.
+          
+          ### 📁 Package Contents
+          
+          - `robOS.bin` - Main application binary
+          - `bootloader.bin` - ESP32S3 bootloader
+          - `partition-table.bin` - Partition table
+          - `flash_args` - Flash arguments for esptool
+          - `flash_standalone.sh` - Standalone flash script (no ESP-IDF required)
+          - `FLASH_README.md` - Detailed flashing instructions
+          - `build_info.txt` - Build information and details
+          
+          ### 🔧 Manual Flash Command
+          
+          If you prefer to flash manually:
+          ```bash
+          esptool.py --chip esp32s3 --port /dev/ttyUSB0 --baud 460800 write_flash @flash_args
+          ```
+          
+          ### 📊 Build Info
+          
+          - **Target**: ESP32S3
+          - **ESP-IDF Version**: ${{ env.IDF_VERSION }}
+          - **Build Date**: ${{ github.event.head_commit.timestamp }}
+          - **Git Commit**: ${{ github.sha }}
+          
+        files: |
+          robOS-esp32s3-${{ github.ref_name }}.zip
+        draft: false
+        prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
