@@ -82,8 +82,8 @@ jobs:
         # Clean any previous configuration
         rm -f sdkconfig
         
-        # Set target
-        idf.py set-target esp32s3 -v
+        # Set target and build in one command
+        idf.py set-target esp32s3
         echo "Target set successfully"
         
         # Verify configuration
@@ -97,7 +97,7 @@ jobs:
         fi
         
         echo "=== Starting build ==="
-        idf.py build -v
+        idf.py build
         echo "✅ Build completed successfully"
         
     - name: Verify build outputs
