@@ -28,10 +28,24 @@ jobs:
         python-version: '3.11'
     
     - name: Install ESP-IDF
-      uses: espressif/esp-idf-ci-action@v1
-      with:
-        esp_idf_version: ${{ env.IDF_VERSION }}
-        target: esp32s3
+      shell: bash
+      run: |
+        echo "Installing ESP-IDF ${{ env.IDF_VERSION }}..."
+        
+        # Install dependencies
+        sudo apt-get update
+        sudo apt-get install -y git wget flex bison gperf python3 python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
+        
+        # Clone ESP-IDF
+        git clone --recursive --depth 1 --branch ${{ env.IDF_VERSION }} https://github.com/espressif/esp-idf.git ~/esp-idf
+        
+        # Install ESP-IDF
+        cd ~/esp-idf
+        ./install.sh esp32s3
+        
+        # Export IDF_PATH
+        echo "IDF_PATH=$HOME/esp-idf" >> $GITHUB_ENV
+        echo "$HOME/esp-idf/tools" >> $GITHUB_PATH
     
     - name: Cache ESP-IDF and components
       uses: actions/cache@v4
@@ -46,7 +60,12 @@ jobs:
     - name: Setup build environment
       run: |
         echo "Setting up ESP-IDF environment..."
-        . $IDF_PATH/export.sh
+        source $IDF_PATH/export.sh
+        
+        # Add ESP-IDF tools to PATH for subsequent steps
+        echo "$HOME/esp-idf/tools" >> $GITHUB_PATH
+        echo "IDF_PYTHON_ENV_PATH=$($IDF_PATH/tools/idf_tools.py export --format key-value | grep IDF_PYTHON_ENV_PATH | cut -d= -f2)" >> $GITHUB_ENV
+        
         echo "ESP-IDF Path: $IDF_PATH"
         echo "Python version: $(python --version)"
         echo "IDF version: $(idf.py --version)"
@@ -66,21 +85,21 @@ jobs:
         
     - name: Configure project
       run: |
-        . $IDF_PATH/export.sh
+        source $IDF_PATH/export.sh
         echo "Configuring project for ESP32S3..."
         
         # Clean any previous configuration
         rm -f sdkconfig
         
         # Set target
-        idf.py set-target esp32s3
+        idf.py set-target esp32s3 -v
         echo "Target set successfully"
         
         # Verify configuration
         echo "Verifying sdkconfig..."
         if [ -f sdkconfig ]; then
           echo "✅ sdkconfig generated successfully"
-          grep "CONFIG_IDF_TARGET_ESP32S3=y" sdkconfig && echo "✅ ESP32S3 target confirmed"
+          grep "CONFIG_IDF_TARGET_ESP32S3=y" sdkconfig && echo "✅ ESP32S3 target confirmed" || echo "❌ ESP32S3 target not found in sdkconfig"
         else
           echo "❌ sdkconfig not generated!"
           exit 1
@@ -88,9 +107,9 @@ jobs:
         
     - name: Build firmware
       run: |
-        . $IDF_PATH/export.sh
-        echo "Starting build..."
-        idf.py build
+        source $IDF_PATH/export.sh
+        echo "Starting build with verbose output..."
+        idf.py build -v
         echo "Build completed successfully"
         
     - name: Verify build outputs
