@@ -13,10 +13,17 @@
 
 ## 📚 项目文档
 
+### 核心文档
 - **[项目进度记录](docs/PROJECT_PROGRESS.md)** - 详细的开发进度和完成状态
 - **[技术架构文档](docs/TECHNICAL_ARCHITECTURE.md)** - 系统架构设计和技术决策
 - **[API参考文档](docs/API_REFERENCE.md)** - 完整的API接口文档
 - **[代码规范](docs/CODING_STANDARDS.md)** - 开发规范和最佳实践
+
+### 新功能文档
+- **[温度集成指南](docs/TEMPERATURE_INTEGRATION_GUIDE.md)** - AGX温度集成到风扇控制系统的完整指南
+- **[智能安全温度策略](docs/SMART_SAFETY_TEMPERATURE_STRATEGY.md)** - 分层安全温度保护机制设计文档
+- **[AGX监控更新](docs/AGX_MONITOR_UPDATES.md)** - AGX监控组件开发记录
+- **[AGX启动延时功能](docs/AGX_STARTUP_DELAY_FEATURE.md)** - AGX系统启动保护机制
 
 ## ⭐ 项目状态
 
@@ -24,8 +31,10 @@
 - ✅ **硬件抽象层组件** - 5个测试用例全部通过
 - ✅ **控制台核心组件** - 8个测试用例全部通过
 - ✅ **配置管理组件** - 统一NVS配置管理，支持多种数据类型
-- ✅ **风扇控制组件** - 完整PWM控制，温度曲线，配置持久化
+- ✅ **风扇控制组件** - 完整PWM控制，温度曲线，配置持久化，智能温度管理
+- ✅ **AGX监控组件** - WebSocket实时监控，CPU温度集成，静默运行模式
 - ✅ **Matrix LED组件** - 32x32 WS2812矩阵控制，支持像素绘图、动画播放
+- ✅ **智能温度管理** - 多层次安全保护，AGX数据集成，调试模式兼容
 - 📋 **系统监控组件** - 待开发
 
 ## 🏗️ 项目架构
@@ -34,13 +43,14 @@
 ```
 robOS/
 ├── components/                    # 独立功能组件
-│   ├── console_core/             # 控制台核心组件
+│   ├── console_core/             # 控制台核心组件 🌡️
 │   ├── hardware_hal/             # 硬件抽象层组件
 │   ├── gpio_controller/          # GPIO通用控制组件 ⚡
 │   ├── usb_mux_controller/       # USB MUX切换控制组件 ⚡
 │   ├── hardware_commands/        # 硬件控制台命令组件 ⚡
 │   ├── config_manager/           # 配置管理组件
-│   ├── fan_controller/           # 风扇控制组件
+│   ├── fan_controller/           # 风扇控制组件 🌡️
+│   ├── agx_monitor/              # AGX监控组件 🔍
 │   ├── touch_led/                # 触摸LED控制组件 ✨
 │   ├── ethernet_manager/         # 以太网管理组件
 │   ├── storage_manager/          # 存储管理组件
@@ -54,13 +64,14 @@ robOS/
 ```
 
 ### 组件职责
-- **console_core**: UART接口、命令解析器、帮助系统
+- **console_core**: 🌡️ UART接口、命令解析器、帮助系统、智能温度管理
 - **hardware_hal**: GPIO、PWM、SPI、ADC、UART等底层接口抽象
 - **gpio_controller**: ⚡ 通用GPIO控制、安全操作、引脚管理
 - **usb_mux_controller**: ⚡ USB-C接口切换、ESP32S3/AGX/N305目标管理
 - **hardware_commands**: ⚡ GPIO和USB MUX控制台命令接口
 - **config_manager**: 统一NVS配置管理、多数据类型支持、自动提交
-- **fan_controller**: PWM风扇控制、温度曲线、多模式运行、配置持久化
+- **fan_controller**: 🌡️ PWM风扇控制、温度曲线、多模式运行、配置持久化、智能温度集成
+- **agx_monitor**: 🔍 AGX系统监控、WebSocket连接、CPU温度数据推送、静默运行
 - **matrix_led**: 32x32 WS2812 LED矩阵控制，像素绘图、动画播放、亮度调节
 - **ethernet_manager**: W5500控制、DHCP服务器、网关功能
 - **storage_manager**: TF卡管理、文件系统操作、NVS配置管理
@@ -272,17 +283,180 @@ fan config save                             # 保存配置
 - 配置持久化 - 完全实现
 - 错误恢复机制 - 完全实现
 
-**🚧 开发中功能**
-- 自动温度模式 - 接口已定义，需要集成温度传感器
-  - 当前使用固定温度值 (25°C)
-  - 需要集成ESP32S3内部温度传感器或外部传感器
-  - 预计在系统监控组件完成后集成
+**✅ 新增智能温度管理功能**
+- 智能温度源优先级系统 - 手动模式、AGX自动模式、默认保护
+- AGX CPU温度自动集成 - 实时温度数据推送到风扇控制
+- 分层安全保护策略 - 启动保护、离线保护、数据过期保护
+- 温度管理命令系统 - `temp` 命令替代 `test temp`，提供完整温度控制
 
 **🔧 技术细节**
-- 使用 `test temp <值>` 命令可以模拟温度输入进行调试
-- 曲线模式已可完全替代自动温度模式的功能
+- 使用 `temp set <值>` 命令设置手动测试温度（兼容原 `test temp`）
+- 使用 `temp auto/manual` 命令在AGX自动模式和手动模式间切换
+- 使用 `temp status` 命令查看当前温度源和安全状态
+- 曲线模式智能选择温度源：手动 > AGX实时 > 安全默认
+- 分层安全温度：启动75°C，离线85°C，过期65°C，备用45°C
 - 所有模式都支持线性插值算法，保证平滑的转速变化
 - `fan config` 和 `fan help` 命令正确返回成功状态码
+
+### AGX监控功能 🔍
+- **连接协议**: WebSocket over Socket.IO
+- **服务器地址**: ws://10.10.99.98:58090/socket.io/
+- **数据更新频率**: 1Hz实时监控
+- **启动保护**: 45秒AGX系统启动延迟
+- **静默运行**: 完全静默模式，不干扰控制台操作
+
+#### AGX监控数据
+- **CPU信息**: 多核心使用率、频率监控
+- **内存信息**: RAM和SWAP使用情况
+- **温度监控**: CPU、SoC0-2、Junction温度
+- **功耗监控**: GPU+SoC、CPU、系统5V、内存功耗
+- **GPU信息**: 3D GPU频率监控
+
+#### AGX监控命令
+
+**基本控制**
+```bash
+agx_monitor start          # 启动AGX监控
+agx_monitor stop           # 停止AGX监控  
+agx_monitor status         # 显示连接状态
+```
+
+**数据查看**
+```bash
+agx_monitor data           # 显示完整监控数据
+agx_monitor config         # 显示配置信息
+agx_monitor stats          # 显示统计信息
+agx_monitor debug          # 显示调试信息
+```
+
+#### 实时温度集成
+
+**自动数据推送**
+- AGX CPU温度自动推送到风扇控制系统
+- 1秒更新频率，确保温度响应及时
+- 线程安全的数据同步机制
+
+**温度源优先级**（由 `temp` 命令管理）
+1. **手动模式** - `temp set 45` 设置测试温度
+2. **AGX自动** - 使用实时AGX CPU温度
+3. **安全保护** - 多层安全温度策略
+
+**智能安全策略**
+```bash
+# 系统启动60秒内：75°C高温保护
+# AGX离线未连接：85°C紧急保护  
+# AGX数据过期>10s：65°C回退保护
+# 正常运行：实际AGX CPU温度
+```
+
+#### 静默运行特性
+
+**完全静默设计**
+- WebSocket连接过程静默
+- 数据解析过程静默
+- 重连机制静默执行
+- 只在关键错误时输出日志
+
+**日志级别控制**
+- AGX监控组件：DEBUG级别
+- WebSocket库：NONE级别（完全静默）
+- 不干扰控制台正常操作
+
+#### 连接管理
+
+**自动重连机制**
+- 连接丢失时自动重连
+- 3次快速重试（1秒间隔）
+- 后续固定间隔重连（3秒）
+- 45秒AGX启动保护延迟
+
+**连接状态监控**
+```bash
+agx_monitor status
+# 输出：
+# Connection Status: Connected
+# Server: 10.10.99.98:58090
+# Uptime: 5 minutes 23 seconds
+# Data Updates: 323 received
+```
+
+#### 配置管理
+
+**默认配置**
+```c
+server_url = "10.10.99.98";
+server_port = 58090;
+reconnect_interval = 3000ms;
+startup_delay = 45000ms;  // AGX启动保护
+heartbeat_timeout = 10000ms;
+```
+
+**配置持久化**
+- 所有配置自动保存到NVS
+- 支持运行时配置修改
+- 重启后自动恢复设置
+
+#### 开发状态
+
+**✅ 已完成功能**
+- WebSocket连接和数据接收
+- 完整数据解析（CPU、内存、温度、功耗、GPU）
+- 静默运行模式
+- 自动重连机制
+- 温度数据自动推送到风扇控制
+- 控制台命令系统
+
+**🔧 技术特性**
+- 事件驱动架构
+- 线程安全数据访问
+- 内存优化设计
+- 错误处理和恢复
+- 与风扇控制系统深度集成
+
+### 智能温度管理系统 🌡️
+
+#### 温度命令系统
+```bash
+temp set 45        # 设置手动测试温度
+temp get           # 获取当前有效温度  
+temp auto          # 切换到AGX自动模式
+temp manual        # 切换到手动测试模式
+temp status        # 显示详细温度状态
+```
+
+#### 温度源优先级策略
+
+**1. 手动模式**（最高优先级）
+- 触发：`temp set <温度>` 命令
+- 用途：调试和测试风扇曲线
+- 兼容：支持原有 `test temp` 命令
+
+**2. AGX自动模式**（智能分层保护）
+- **启动保护**：系统启动60秒内使用75°C
+- **离线保护**：AGX从未连接时使用85°C  
+- **过期保护**：AGX数据>10秒时使用65°C
+- **正常运行**：使用实时AGX CPU温度
+
+**3. 系统备用**（最低优先级）
+- 互斥锁超时等异常情况使用45°C
+
+#### 安全保护机制
+
+**时间戳追踪**
+- 系统启动时间记录
+- AGX数据更新时间戳
+- 智能状态判断和切换
+
+**状态监控显示**
+```bash
+temp status
+# 输出示例：
+# Temperature Mode: AGX Auto
+# Effective Temperature: 75.0°C
+# Temperature Source: Startup Protection (High temp for 60s startup safety)
+# System Uptime: 45 seconds
+# AGX Data: Never received
+```
 
 ### USB MUX控制
 - **MUX1引脚**: GPIO 8 - USB MUX1选择控制
@@ -682,3 +856,115 @@ https://github.com/thomas-hiddenpeak/rm01-esp32s3-bsp
   - 数据协议深度分析
   - 完整的调试工具套件
   - 10个专用控制台命令
+
+## 🚀 快速开始
+
+### 1. 系统状态检查
+```bash
+help                    # 查看系统概览和可用命令
+status                  # 显示控制台状态
+temp status             # 检查温度管理状态
+```
+
+### 2. AGX监控启动
+```bash
+agx_monitor start       # 启动AGX系统监控
+agx_monitor status      # 检查连接状态
+agx_monitor data        # 查看监控数据
+```
+
+### 3. 智能风扇控制
+```bash
+fan status              # 查看风扇状态
+temp auto               # 启用AGX温度自动控制
+fan mode 0 curve        # 设置风扇为曲线模式
+fan config curve 0 40:20 50:40 60:70 70:100  # 配置温度曲线
+```
+
+### 4. 手动调试模式
+```bash
+temp manual             # 切换到手动模式
+temp set 50             # 设置测试温度50°C
+fan status              # 查看风扇响应
+temp auto               # 切换回自动模式
+```
+
+## 📋 命令参考
+
+### 🌡️ 温度管理命令
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `temp status` | 显示温度管理状态 | `temp status` |
+| `temp get` | 获取当前有效温度 | `temp get` |
+| `temp set <value>` | 设置手动测试温度 | `temp set 45` |
+| `temp auto` | 切换到AGX自动模式 | `temp auto` |
+| `temp manual` | 切换到手动测试模式 | `temp manual` |
+
+### 🔍 AGX监控命令
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `agx_monitor start` | 启动AGX监控 | `agx_monitor start` |
+| `agx_monitor stop` | 停止AGX监控 | `agx_monitor stop` |
+| `agx_monitor status` | 显示连接状态 | `agx_monitor status` |
+| `agx_monitor data` | 显示监控数据 | `agx_monitor data` |
+| `agx_monitor config` | 显示配置信息 | `agx_monitor config` |
+| `agx_monitor stats` | 显示统计信息 | `agx_monitor stats` |
+
+### 🌪️ 风扇控制命令
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `fan status` | 显示风扇状态 | `fan status` |
+| `fan set <id> <speed>` | 设置风扇转速 | `fan set 0 75` |
+| `fan mode <id> <mode>` | 设置工作模式 | `fan mode 0 curve` |
+| `fan enable <id> <on/off>` | 启用/禁用风扇 | `fan enable 0 on` |
+| `fan config curve <id> <points>` | 配置温度曲线 | `fan config curve 0 30:20 50:40` |
+| `fan config save` | 保存配置 | `fan config save` |
+
+### ⚡ GPIO控制命令
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `gpio <pin> high` | 设置GPIO高电平 | `gpio 42 high` |
+| `gpio <pin> low` | 设置GPIO低电平 | `gpio 42 low` |
+| `gpio <pin> input` | 设置为输入模式 | `gpio 42 input` |
+| `usbmux <target>` | 切换USB MUX | `usbmux agx` |
+
+### 🎨 Matrix LED命令
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `led matrix status` | 显示矩阵状态 | `led matrix status` |
+| `led matrix fill <r> <g> <b>` | 填充颜色 | `led matrix fill 255 0 0` |
+| `led matrix clear` | 清空显示 | `led matrix clear` |
+| `led matrix animation <type>` | 播放动画 | `led matrix animation rainbow` |
+
+### 🔧 系统命令
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `help` | 显示系统概览和命令列表 | `help` |
+| `help <command>` | 显示特定命令帮助 | `help temp` |
+| `version` | 显示版本信息 | `version` |
+| `status` | 显示控制台状态 | `status` |
+| `clear` | 清屏 | `clear` |
+| `history` | 显示命令历史 | `history` |
+
+## 📚 相关文档
+
+### 功能使用指南
+- **[温度集成指南](docs/TEMPERATURE_INTEGRATION_GUIDE.md)** - AGX温度集成到风扇控制的完整使用指南
+- **[智能安全温度策略](docs/SMART_SAFETY_TEMPERATURE_STRATEGY.md)** - 分层安全温度保护机制详解
+
+### 开发技术文档
+- **[项目进度记录](docs/PROJECT_PROGRESS.md)** - 详细的开发进度和完成状态
+- **[技术架构文档](docs/TECHNICAL_ARCHITECTURE.md)** - 系统架构设计和技术决策
+- **[API参考文档](docs/API_REFERENCE.md)** - 完整的API接口文档
+- **[代码规范](docs/CODING_STANDARDS.md)** - 开发规范和最佳实践
+
+### 特性开发记录
+- **[AGX监控更新](docs/AGX_MONITOR_UPDATES.md)** - AGX监控组件开发记录
+- **[AGX启动延迟功能](docs/AGX_STARTUP_DELAY_FEATURE.md)** - AGX系统启动保护机制
+- **[绝对静默模式](docs/ABSOLUTE_SILENCE_FINAL.md)** - AGX监控静默运行实现
+
+---
+
+**项目版本**: robOS v2.0.0  
+**更新日期**: 2025年10月4日  
+**开发团队**: robOS Team

@@ -20,6 +20,7 @@
 #include <string.h>
 
 // Component includes
+#include "agx_monitor.h"
 #include "board_led.h"
 #include "config_manager.h"
 #include "console_core.h"
@@ -56,11 +57,10 @@ static void storage_mount_callback(storage_operation_type_t operation,
     storage_mount_result = result;
 
     if (result == ESP_OK) {
-      ESP_LOGI(TAG,
-               "✓ SD card auto-mount successful - storage ready at /sdcard");
+      ESP_LOGI(TAG, "SD card auto-mount successful - storage ready at /sdcard");
       ESP_LOGI(TAG, "Use 'sdcard' command to enter interactive storage shell");
     } else {
-      // 提供更友好的错误信息
+      // Provide friendly error messages
       switch (result) {
       case ESP_ERR_TIMEOUT:
         ESP_LOGW(TAG, "No SD card detected - slot is empty");
@@ -519,10 +519,44 @@ static esp_err_t system_init(void) {
     }
   }
 
-  // TODO: Initialize other components if needed
+  // 10. AGX Monitor (AGX system monitoring via WebSocket)
+  ESP_LOGI(TAG, "Initializing AGX monitor...");
+  agx_monitor_config_t agx_config;
+  ret = agx_monitor_get_default_config(&agx_config);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to get AGX monitor default config: %s",
+             esp_err_to_name(ret));
+    // AGX monitor is not critical for system boot, continue with warning
+    ESP_LOGW(TAG, "Continuing without AGX monitor functionality");
+  } else {
+    ret = agx_monitor_init(&agx_config);
+    if (ret != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to initialize AGX monitor: %s",
+               esp_err_to_name(ret));
+      // AGX monitor is not critical for system boot, continue with warning
+      ESP_LOGW(TAG, "Continuing without AGX monitor functionality");
+    } else {
+      ESP_LOGI(TAG, "AGX monitor initialized (WebSocket client for %s:%d)",
+               agx_config.server_url, agx_config.server_port);
+
+      // AGX monitor auto-starts if auto_start is enabled in config
+      if (!agx_config.auto_start) {
+        ret = agx_monitor_start();
+        if (ret != ESP_OK) {
+          ESP_LOGW(TAG, "Failed to start AGX monitor: %s",
+                   esp_err_to_name(ret));
+        } else {
+          ESP_LOGI(TAG, "AGX monitor started - connecting to AGX server");
+        }
+      } else {
+        ESP_LOGI(TAG, "AGX monitor auto-started during initialization");
+      }
+    }
+  }
 
   ESP_LOGI(TAG, "robOS system initialization completed");
-  return ret;
+  return ESP_OK; // System initialization is complete, regardless of individual
+                 // component issues
 }
 
 /**
