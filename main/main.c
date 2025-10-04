@@ -36,12 +36,15 @@
 #include "storage_manager.h"
 #include "touch_led.h"
 #include "usb_mux_controller.h"
+#include "web_server.h"
 
 static const char *TAG = "ROBOS_MAIN";
 
 // Storage mount synchronization
 static SemaphoreHandle_t storage_mount_semaphore = NULL;
 static esp_err_t storage_mount_result = ESP_FAIL;
+
+// Web server status tracking - simplified approach
 
 /**
  * @brief Storage mount callback for startup auto-mount with synchronization
@@ -519,7 +522,22 @@ static esp_err_t system_init(void) {
     }
   }
 
-  // 10. AGX Monitor (AGX system monitoring via WebSocket)
+  // 10. Web Server (HTTP server for web interface and API)
+  // Start web server if storage is mounted (simple approach like reference
+  // project)
+  if (storage_mount_result == ESP_OK) {
+    ESP_LOGI(TAG, "Storage is ready, starting web server...");
+    ret = web_server_start();
+    if (ret != ESP_OK) {
+      ESP_LOGW(TAG, "Failed to start web server: %s", esp_err_to_name(ret));
+      ESP_LOGW(TAG, "Continuing without web server functionality");
+    }
+  } else {
+    ESP_LOGI(TAG, "Storage not ready, skipping web server start");
+    ESP_LOGI(TAG, "Web server will be available after mounting SD card");
+  }
+
+  // 11. AGX Monitor (AGX system monitoring via WebSocket)
   ESP_LOGI(TAG, "Initializing AGX monitor...");
   agx_monitor_config_t agx_config;
   ret = agx_monitor_get_default_config(&agx_config);
