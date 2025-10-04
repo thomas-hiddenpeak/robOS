@@ -9,7 +9,7 @@ on:
   workflow_dispatch:  # 允许手动触发
 
 env:
-  IDF_VERSION: 'v5.1.4'  # 指定ESP-IDF版本
+  IDF_VERSION: 'v5.2.2'  # 使用更稳定的ESP-IDF版本
   PROJECT_NAME: 'robOS'
 
 jobs:
@@ -21,6 +21,11 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
     
     - name: Install ESP-IDF
       uses: espressif/esp-idf-ci-action@v1
@@ -34,19 +39,82 @@ jobs:
         path: |
           ~/.espressif
           build/managed_components
-        key: ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-${{ hashFiles('**/idf_component.yml', '**/CMakeLists.txt') }}
+        key: ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-${{ hashFiles('**/idf_component.yml', '**/CMakeLists.txt', 'sdkconfig.defaults') }}
         restore-keys: |
           ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-
     
-    - name: Configure ESP-IDF
+    - name: Setup build environment
+      run: |
+        echo "Setting up ESP-IDF environment..."
+        . $IDF_PATH/export.sh
+        echo "ESP-IDF Path: $IDF_PATH"
+        echo "Python version: $(python --version)"
+        echo "IDF version: $(idf.py --version)"
+        
+        # Check component dependencies
+        echo "Checking component structure..."
+        ls -la components/
+        
+        # Check if all required components exist
+        for component in event_manager hardware_hal console_core fan_controller touch_led board_led storage_manager matrix_led ethernet_manager power_monitor gpio_controller usb_mux_controller device_controller hardware_commands agx_monitor web_server; do
+          if [ -d "components/$component" ]; then
+            echo "✅ $component component found"
+          else
+            echo "❌ $component component missing!"
+          fi
+        done
+        
+    - name: Configure project
       run: |
         . $IDF_PATH/export.sh
+        echo "Configuring project for ESP32S3..."
+        
+        # Clean any previous configuration
+        rm -f sdkconfig
+        
+        # Set target
         idf.py set-target esp32s3
+        echo "Target set successfully"
+        
+        # Verify configuration
+        echo "Verifying sdkconfig..."
+        if [ -f sdkconfig ]; then
+          echo "✅ sdkconfig generated successfully"
+          grep "CONFIG_IDF_TARGET_ESP32S3=y" sdkconfig && echo "✅ ESP32S3 target confirmed"
+        else
+          echo "❌ sdkconfig not generated!"
+          exit 1
+        fi
         
     - name: Build firmware
       run: |
         . $IDF_PATH/export.sh
+        echo "Starting build..."
         idf.py build
+        echo "Build completed successfully"
+        
+    - name: Verify build outputs
+      run: |
+        echo "Verifying build outputs..."
+        ls -la build/
+        echo "Checking for essential files..."
+        
+        if [ ! -f "build/robOS.bin" ]; then
+          echo "❌ robOS.bin not found!"
+          exit 1
+        fi
+        
+        if [ ! -f "build/bootloader/bootloader.bin" ]; then
+          echo "❌ bootloader.bin not found!"
+          exit 1
+        fi
+        
+        if [ ! -f "build/partition_table/partition-table.bin" ]; then
+          echo "❌ partition-table.bin not found!"
+          exit 1
+        fi
+        
+        echo "✅ All essential files found"
         
     - name: Generate build info
       run: |
@@ -58,15 +126,29 @@ jobs:
         echo "Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> build_info.txt
         echo "Git Commit: ${{ github.sha }}" >> build_info.txt
         echo "Git Branch: ${{ github.ref_name }}" >> build_info.txt
+        echo "Build Number: ${{ github.run_number }}" >> build_info.txt
         echo "" >> build_info.txt
         echo "Flash Command:" >> build_info.txt
-        echo "esptool.py --chip esp32s3 --port /dev/ttyUSB0 --baud 460800 write_flash @build/flash_args" >> build_info.txt
+        echo "esptool.py --chip esp32s3 --port /dev/ttyUSB0 --baud 460800 write_flash @flash_args" >> build_info.txt
         echo "" >> build_info.txt
         echo "Files in this build:" >> build_info.txt
         echo "===================" >> build_info.txt
-        ls -la build/*.bin build/*.elf 2>/dev/null | while read line; do
-          echo "$line" >> build_info.txt
-        done || echo "No binary files found" >> build_info.txt
+        
+        # List build files with sizes
+        for file in build/*.bin build/*.elf; do
+          if [ -f "$file" ]; then
+            size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
+            basename_file=$(basename "$file")
+            printf "%-25s %10d bytes\n" "$basename_file" "$size" >> build_info.txt
+          fi
+        done
+        
+        echo "" >> build_info.txt
+        echo "Flash Layout:" >> build_info.txt
+        echo "=============" >> build_info.txt
+        if [ -f "build/flash_args" ]; then
+          cat build/flash_args >> build_info.txt
+        fi
         
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
