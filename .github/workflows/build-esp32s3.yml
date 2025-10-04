@@ -57,21 +57,16 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-esp-idf-${{ env.IDF_VERSION }}-
     
-    - name: Setup build environment
+    - name: Build ESP32S3 Firmware
       run: |
-        echo "Setting up ESP-IDF environment..."
+        echo "=== Setting up ESP-IDF environment ==="
         source $IDF_PATH/export.sh
-        
-        # Add ESP-IDF tools to PATH for subsequent steps
-        echo "$HOME/esp-idf/tools" >> $GITHUB_PATH
-        echo "IDF_PYTHON_ENV_PATH=$($IDF_PATH/tools/idf_tools.py export --format key-value | grep IDF_PYTHON_ENV_PATH | cut -d= -f2)" >> $GITHUB_ENV
         
         echo "ESP-IDF Path: $IDF_PATH"
         echo "Python version: $(python --version)"
         echo "IDF version: $(idf.py --version)"
         
-        # Check component dependencies
-        echo "Checking component structure..."
+        echo "=== Checking component structure ==="
         ls -la components/
         
         # Check if all required components exist
@@ -83,11 +78,7 @@ jobs:
           fi
         done
         
-    - name: Configure project
-      run: |
-        source $IDF_PATH/export.sh
-        echo "Configuring project for ESP32S3..."
-        
+        echo "=== Configuring project for ESP32S3 ==="
         # Clean any previous configuration
         rm -f sdkconfig
         
@@ -105,16 +96,13 @@ jobs:
           exit 1
         fi
         
-    - name: Build firmware
-      run: |
-        source $IDF_PATH/export.sh
-        echo "Starting build with verbose output..."
+        echo "=== Starting build ==="
         idf.py build -v
-        echo "Build completed successfully"
+        echo "✅ Build completed successfully"
         
     - name: Verify build outputs
       run: |
-        echo "Verifying build outputs..."
+        echo "=== Verifying build outputs ==="
         ls -la build/
         echo "Checking for essential files..."
         
