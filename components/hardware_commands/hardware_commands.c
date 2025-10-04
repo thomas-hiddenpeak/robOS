@@ -300,11 +300,11 @@ static esp_err_t register_hardware_commands(void) {
        .min_args = 1,
        .max_args = 1},
       {.command = "lpmu",
-       .help = "lpmu toggle|reset|status - LPMU device control commands",
-       .hint = "toggle|reset|status",
+       .help = "lpmu toggle|reset|status|config - LPMU device control commands",
+       .hint = "toggle|reset|status|config",
        .func = hardware_cmd_lpmu,
        .min_args = 1,
-       .max_args = 1}};
+       .max_args = 3}};
 
   for (size_t i = 0; i < sizeof(commands) / sizeof(commands[0]); i++) {
     esp_err_t ret = console_register_command(&commands[i]);
@@ -471,10 +471,73 @@ esp_err_t hardware_cmd_lpmu(int argc, char **argv) {
     power_state_t power_state;
     ret = device_controller_lpmu_get_power_state(&power_state);
     if (ret == ESP_OK) {
-      printf("LPMU 设备状态: %s\r\n",
-             power_state == POWER_STATE_ON ? "开机" : "关机");
+      const char *state_str;
+      switch (power_state) {
+      case POWER_STATE_ON:
+        state_str = "开机";
+        break;
+      case POWER_STATE_OFF:
+        state_str = "关机";
+        break;
+      case POWER_STATE_UNKNOWN:
+        state_str = "未知 (使用 toggle 命令启动)";
+        break;
+      default:
+        state_str = "无效状态";
+        break;
+      }
+      printf("LPMU 设备状态: %s\r\n", state_str);
+
+      // Also show auto-start configuration
+      bool auto_start;
+      if (device_controller_get_lpmu_auto_start(&auto_start) == ESP_OK) {
+        printf("开机自启动: %s\r\n", auto_start ? "开启" : "关闭");
+      }
     } else {
       printf("错误: 获取 LPMU 设备状态失败: %s\r\n", esp_err_to_name(ret));
+    }
+  } else if (strcmp(argv[1], "config") == 0) {
+    if (argc < 3) {
+      printf("用法: lpmu config auto-start [on|off]\r\n");
+      ret = ESP_ERR_INVALID_ARG;
+    } else if (strcmp(argv[2], "auto-start") == 0) {
+      if (argc == 3) {
+        // Show current auto-start status
+        bool auto_start;
+        ret = device_controller_get_lpmu_auto_start(&auto_start);
+        if (ret == ESP_OK) {
+          printf("LPMU 开机自启动: %s\r\n", auto_start ? "开启" : "关闭");
+        } else {
+          printf("错误: 获取自启动状态失败: %s\r\n", esp_err_to_name(ret));
+        }
+      } else if (argc == 4) {
+        // Set auto-start status
+        bool auto_start;
+        if (strcmp(argv[3], "on") == 0) {
+          auto_start = true;
+        } else if (strcmp(argv[3], "off") == 0) {
+          auto_start = false;
+        } else {
+          printf("错误: 无效的参数，请使用 'on' 或 'off'\r\n");
+          ret = ESP_ERR_INVALID_ARG;
+        }
+
+        if (ret == ESP_OK) {
+          ret = device_controller_set_lpmu_auto_start(auto_start);
+          if (ret == ESP_OK) {
+            printf("LPMU 开机自启动已%s\r\n", auto_start ? "开启" : "关闭");
+          } else {
+            printf("错误: 设置自启动失败: %s\r\n", esp_err_to_name(ret));
+          }
+        }
+      } else {
+        printf("用法: lpmu config auto-start [on|off]\r\n");
+        ret = ESP_ERR_INVALID_ARG;
+      }
+    } else {
+      printf("错误: 无效的配置选项: %s\r\n", argv[2]);
+      printf("可用选项: auto-start\r\n");
+      ret = ESP_ERR_INVALID_ARG;
     }
   } else {
     printf("错误: 无效的操作: %s\r\n", argv[1]);
@@ -496,8 +559,11 @@ static void print_agx_usage(void) {
 }
 
 static void print_lpmu_usage(void) {
-  printf("用法: lpmu toggle|reset|status\r\n");
+  printf("用法: lpmu toggle|reset|status|config\r\n");
   printf("  toggle - 切换LPMU设备电源状态\r\n");
   printf("  reset  - 重启LPMU设备\r\n");
   printf("  status - 显示LPMU设备电源状态\r\n");
+  printf("  config - 配置LPMU设备选项\r\n");
+  printf("    config auto-start on|off  - 设置开机自动启动\r\n");
+  printf("    config auto-start         - 查看自动启动状态\r\n");
 }

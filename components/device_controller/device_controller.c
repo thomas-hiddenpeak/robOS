@@ -7,6 +7,7 @@
  */
 
 #include "device_controller.h"
+#include "config_manager.h"
 #include "esp_log.h"
 #include "gpio_controller.h"
 #include "usb_mux_controller.h"
@@ -16,11 +17,20 @@
 #include <string.h>
 
 /* ============================================================================
+ * Private Constants
+ * ============================================================================
+ */
+
+#define DEVICE_CONFIG_NAMESPACE "device"
+#define DEVICE_CONFIG_KEY_AUTO_START_LPMU "lpmu_auto"
+
+/* ============================================================================
  * Private Variables
  * ============================================================================
  */
 
 static device_status_t s_device_status = {0};
+static device_config_t s_device_config = {0};
 static const char *TAG = DEVICE_CONTROLLER_TAG;
 static SemaphoreHandle_t s_device_mutex = NULL;
 
@@ -64,19 +74,27 @@ esp_err_t device_controller_init(void) {
     return ret;
   }
 
-  // Initialize status
+  // Initialize status (configuration will be loaded later after config_manager
+  // is ready)
   s_device_status.initialized = true;
   s_device_status.agx_power_state =
       POWER_STATE_ON; // AGX defaults to ON (GPIO3=LOW)
-  s_device_status.lpmu_power_state = POWER_STATE_UNKNOWN;
+  s_device_status.lpmu_power_state =
+      POWER_STATE_OFF; // Initial state, will be updated after config load
   s_device_status.agx_operations_count = 0;
   s_device_status.lpmu_operations_count = 0;
+
+  // Set default configuration (will be updated later)
+  s_device_config = device_controller_get_default_config();
 
   ESP_LOGI(TAG, "Device controller initialized successfully");
   ESP_LOGI(TAG, "AGX - Power: GPIO%d, Reset: GPIO%d, Recovery: GPIO%d",
            AGX_POWER_PIN, AGX_RESET_PIN, AGX_RECOVERY_PIN);
   ESP_LOGI(TAG, "LPMU - Power: GPIO%d, Reset: GPIO%d", LPMU_POWER_BTN_PIN,
            LPMU_RESET_PIN);
+
+  // Note: LPMU auto-start will be handled later in main.c after config_manager
+  // is ready
 
   return ESP_OK;
 }
@@ -315,7 +333,11 @@ esp_err_t device_controller_lpmu_power_toggle(void) {
   }
 
   // Update power state (toggle between ON/OFF)
-  if (s_device_status.lpmu_power_state == POWER_STATE_ON) {
+  // Special handling for UNKNOWN state - assume first toggle turns ON
+  if (s_device_status.lpmu_power_state == POWER_STATE_UNKNOWN) {
+    s_device_status.lpmu_power_state = POWER_STATE_ON;
+    ESP_LOGI(TAG, "LPMU power toggled from UNKNOWN to ON (first boot)");
+  } else if (s_device_status.lpmu_power_state == POWER_STATE_ON) {
     s_device_status.lpmu_power_state = POWER_STATE_OFF;
     ESP_LOGI(TAG, "LPMU power toggled to OFF");
   } else {
@@ -533,5 +555,165 @@ static esp_err_t init_device_gpio_pins(void) {
   }
 
   ESP_LOGI(TAG, "Device GPIO pins initialized successfully");
+  return ESP_OK;
+}
+
+/* ============================================================================
+ * Configuration Management Functions
+ * ============================================================================
+ */
+
+device_config_t device_controller_get_default_config(void) {
+  device_config_t config = {
+      .auto_start_lpmu = true // Default: auto-start LPMU on boot
+  };
+  return config;
+}
+
+esp_err_t device_controller_load_config(device_config_t *config) {
+  if (config == NULL) {
+    ESP_LOGE(TAG, "Config pointer is NULL");
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  // Start with default values
+  *config = device_controller_get_default_config();
+
+  // Load auto_start_lpmu setting
+  bool auto_start;
+  ESP_LOGI(TAG, "Attempting to load config: namespace='%s', key='%s'",
+           DEVICE_CONFIG_NAMESPACE, DEVICE_CONFIG_KEY_AUTO_START_LPMU);
+
+  // Try direct call to config_manager_get instead of macro
+  esp_err_t ret = config_manager_get(DEVICE_CONFIG_NAMESPACE,
+                                     DEVICE_CONFIG_KEY_AUTO_START_LPMU,
+                                     CONFIG_TYPE_BOOL, &auto_start, NULL);
+  if (ret == ESP_OK) {
+    config->auto_start_lpmu = auto_start;
+    ESP_LOGI(TAG, "Successfully loaded auto_start_lpmu: %s",
+             auto_start ? "true" : "false");
+  } else if (ret == ESP_ERR_NOT_FOUND) {
+    ESP_LOGI(TAG, "auto_start_lpmu not configured, using default: true");
+    // This is not an error, just use the default value
+  } else {
+    ESP_LOGW(TAG,
+             "Failed to load auto_start_lpmu (namespace='%s', key='%s'): %s",
+             DEVICE_CONFIG_NAMESPACE, DEVICE_CONFIG_KEY_AUTO_START_LPMU,
+             esp_err_to_name(ret));
+    // Don't return error, just use default values
+    ESP_LOGI(TAG, "Using default configuration");
+  }
+
+  return ESP_OK;
+}
+
+esp_err_t device_controller_save_config(const device_config_t *config) {
+  if (config == NULL) {
+    ESP_LOGE(TAG, "Config pointer is NULL");
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  // Save auto_start_lpmu setting
+  bool auto_start_value = config->auto_start_lpmu;
+  ESP_LOGI(TAG, "Attempting to save config: namespace='%s', key='%s', value=%s",
+           DEVICE_CONFIG_NAMESPACE, DEVICE_CONFIG_KEY_AUTO_START_LPMU,
+           auto_start_value ? "true" : "false");
+
+  // Try direct call to config_manager_set instead of macro
+  esp_err_t ret = config_manager_set(
+      DEVICE_CONFIG_NAMESPACE, DEVICE_CONFIG_KEY_AUTO_START_LPMU,
+      CONFIG_TYPE_BOOL, &auto_start_value, sizeof(bool));
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to save auto_start_lpmu: %s", esp_err_to_name(ret));
+    return ret;
+  }
+
+  ESP_LOGI(TAG, "Device configuration saved successfully");
+  return ESP_OK;
+}
+
+esp_err_t device_controller_set_lpmu_auto_start(bool auto_start) {
+  if (!s_device_status.initialized) {
+    ESP_LOGE(TAG, "Device controller not initialized");
+    return ESP_ERR_INVALID_STATE;
+  }
+
+  if (xSemaphoreTake(s_device_mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+    ESP_LOGE(TAG, "Failed to take mutex");
+    return ESP_FAIL;
+  }
+
+  // Update configuration
+  s_device_config.auto_start_lpmu = auto_start;
+
+  // Save to NVS
+  esp_err_t ret = device_controller_save_config(&s_device_config);
+
+  xSemaphoreGive(s_device_mutex);
+
+  if (ret == ESP_OK) {
+    ESP_LOGI(TAG, "LPMU auto-start %s", auto_start ? "enabled" : "disabled");
+  }
+
+  return ret;
+}
+
+esp_err_t device_controller_get_lpmu_auto_start(bool *auto_start) {
+  if (auto_start == NULL) {
+    ESP_LOGE(TAG, "auto_start pointer is NULL");
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  if (!s_device_status.initialized) {
+    ESP_LOGE(TAG, "Device controller not initialized");
+    return ESP_ERR_INVALID_STATE;
+  }
+
+  if (xSemaphoreTake(s_device_mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+    ESP_LOGE(TAG, "Failed to take mutex");
+    return ESP_FAIL;
+  }
+
+  *auto_start = s_device_config.auto_start_lpmu;
+
+  xSemaphoreGive(s_device_mutex);
+  return ESP_OK;
+}
+
+esp_err_t device_controller_post_config_init(void) {
+  if (!s_device_status.initialized) {
+    ESP_LOGE(TAG, "Device controller not initialized");
+    return ESP_ERR_INVALID_STATE;
+  }
+
+  ESP_LOGI(TAG, "Loading device configuration and handling LPMU auto-start...");
+
+  // Load device configuration now that config_manager is ready
+  esp_err_t ret = device_controller_load_config(&s_device_config);
+  if (ret != ESP_OK) {
+    ESP_LOGW(TAG, "Failed to load configuration, using defaults");
+    s_device_config = device_controller_get_default_config();
+  }
+
+  ESP_LOGI(TAG, "Configuration loaded: LPMU auto-start = %s",
+           s_device_config.auto_start_lpmu ? "enabled" : "disabled");
+
+  // Handle LPMU auto-start if configured
+  if (s_device_config.auto_start_lpmu) {
+    ESP_LOGI(TAG, "Auto-starting LPMU...");
+    ret = device_controller_lpmu_power_toggle();
+    if (ret == ESP_OK) {
+      ESP_LOGI(TAG, "LPMU auto-start completed successfully, state: %s",
+               device_controller_get_power_state_name(
+                   s_device_status.lpmu_power_state));
+    } else {
+      ESP_LOGW(TAG, "LPMU auto-start failed: %s", esp_err_to_name(ret));
+      // If auto-start failed, set state to OFF
+      s_device_status.lpmu_power_state = POWER_STATE_OFF;
+    }
+  } else {
+    ESP_LOGI(TAG, "LPMU auto-start disabled");
+  }
+
   return ESP_OK;
 }

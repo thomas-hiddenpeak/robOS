@@ -69,6 +69,13 @@ typedef enum {
 } power_state_t;
 
 /**
+ * @brief Device configuration structure
+ */
+typedef struct {
+  bool auto_start_lpmu; ///< Auto-start LPMU on system boot
+} device_config_t;
+
+/**
  * @brief Device status structure
  */
 typedef struct {
@@ -225,6 +232,72 @@ const char *device_controller_get_power_state_name(power_state_t state);
  *     - ESP_ERR_INVALID_STATE: Controller not initialized
  */
 esp_err_t device_controller_get_status(device_status_t *status);
+
+// ==================== Configuration Management ====================
+
+/**
+ * @brief Get default device configuration
+ *
+ * @return Default configuration structure
+ */
+device_config_t device_controller_get_default_config(void);
+
+/**
+ * @brief Load device configuration from NVS
+ *
+ * @param config Pointer to store loaded configuration
+ * @return
+ *     - ESP_OK: Success
+ *     - ESP_ERR_INVALID_ARG: Invalid pointer
+ *     - ESP_ERR_NOT_FOUND: Configuration not found, using defaults
+ *     - ESP_FAIL: Load failed
+ */
+esp_err_t device_controller_load_config(device_config_t *config);
+
+/**
+ * @brief Save device configuration to NVS
+ *
+ * @param config Configuration to save
+ * @return
+ *     - ESP_OK: Success
+ *     - ESP_ERR_INVALID_ARG: Invalid pointer
+ *     - ESP_FAIL: Save failed
+ */
+esp_err_t device_controller_save_config(const device_config_t *config);
+
+/**
+ * @brief Set LPMU auto-start configuration
+ *
+ * @param auto_start True to enable auto-start, false to disable
+ * @return
+ *     - ESP_OK: Success
+ *     - ESP_FAIL: Configuration save failed
+ */
+esp_err_t device_controller_set_lpmu_auto_start(bool auto_start);
+
+/**
+ * @brief Get LPMU auto-start configuration
+ *
+ * @param auto_start Pointer to store auto-start setting
+ * @return
+ *     - ESP_OK: Success
+ *     - ESP_ERR_INVALID_ARG: Invalid pointer
+ */
+esp_err_t device_controller_get_lpmu_auto_start(bool *auto_start);
+
+/**
+ * @brief Load configuration and handle LPMU auto-start
+ *
+ * This function should be called after config_manager is initialized.
+ * It will load the device configuration and auto-start LPMU if configured.
+ *
+ * @return
+ *     - ESP_OK: Success
+ *     - ESP_FAIL: Configuration load or auto-start failed
+ */
+esp_err_t device_controller_post_config_init(void);
+
+// ==================== Testing Functions ====================
 
 /**
  * @brief Test AGX power control functionality

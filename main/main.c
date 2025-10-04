@@ -306,6 +306,14 @@ static esp_err_t system_init(void) {
   }
   ESP_LOGI(TAG, "Configuration management commands registered");
 
+  // 4.1. Load device configuration and handle LPMU auto-start
+  ret = device_controller_post_config_init();
+  if (ret != ESP_OK) {
+    ESP_LOGW(TAG, "Failed to load device configuration or auto-start LPMU: %s",
+             esp_err_to_name(ret));
+    // This is not critical for system operation, continue with warning
+  }
+
   // 5. Fan Controller (cooling management)
   ret = fan_controller_init(NULL); // Use default configuration
   if (ret != ESP_OK) {
