@@ -123,6 +123,60 @@ jobs:
         
         echo "✅ All essential files found"
         
+    - name: Firmware Quality Analysis
+      run: |
+        echo "=== Firmware Quality Analysis ==="
+        
+        # Install analysis tools
+        pip install esptool
+        
+        # Generate analysis report
+        echo "🔍 Firmware Analysis Report" > build_analysis.txt
+        echo "==========================" >> build_analysis.txt
+        echo "Build Date: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> build_analysis.txt
+        echo "Git Commit: ${{ github.sha }}" >> build_analysis.txt
+        echo "" >> build_analysis.txt
+        
+        # Check file sizes
+        echo "📁 File Sizes:" >> build_analysis.txt
+        for file in build/*.bin build/*.elf; do
+          if [ -f "$file" ]; then
+            size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file" 2>/dev/null)
+            basename_file=$(basename "$file")
+            printf "%-25s %10d bytes\n" "$basename_file" "$size" >> build_analysis.txt
+          fi
+        done
+        echo "" >> build_analysis.txt
+        
+        # Analyze main binary
+        if [ -f "build/robOS.bin" ]; then
+          echo "📊 Binary Analysis:" >> build_analysis.txt
+          size=$(stat -c%s "build/robOS.bin" 2>/dev/null || stat -f%z "build/robOS.bin" 2>/dev/null)
+          size_kb=$((size / 1024))
+          echo "Application size: ${size} bytes (${size_kb} KB)" >> build_analysis.txt
+          
+          if [ $size -lt 1048576 ]; then
+            echo "✅ Size is optimal (< 1MB)" >> build_analysis.txt
+          elif [ $size -lt 2097152 ]; then
+            echo "⚠️  Size is moderate (1-2MB)" >> build_analysis.txt
+          else
+            echo "⚠️  Size is large (> 2MB)" >> build_analysis.txt
+          fi
+          echo "" >> build_analysis.txt
+        fi
+        
+        # Show partition usage if available
+        if [ -f "build/flash_args" ]; then
+          echo "⚡ Flash Layout:" >> build_analysis.txt
+          cat build/flash_args >> build_analysis.txt
+          echo "" >> build_analysis.txt
+        fi
+        
+        echo "✅ Quality analysis complete" >> build_analysis.txt
+        
+        # Display the report
+        cat build_analysis.txt
+        
     - name: Generate build info
       run: |
         echo "Build Information:" > build_info.txt
@@ -169,6 +223,7 @@ jobs:
           build/partition_table/partition-table.bin
           build/bootloader/bootloader.bin
           build_info.txt
+          build_analysis.txt
         retention-days: 30
         
     - name: Upload flashable package
@@ -183,6 +238,7 @@ jobs:
           flash_standalone.sh
           FLASH_README.md
           build_info.txt
+          build_analysis.txt
         retention-days: 30
 
   release:
