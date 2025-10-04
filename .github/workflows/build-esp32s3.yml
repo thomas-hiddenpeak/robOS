@@ -12,6 +12,11 @@ env:
   IDF_VERSION: 'v5.5.1'  # 与开发环境保持一致的ESP-IDF版本
   PROJECT_NAME: 'robOS'
 
+permissions:
+  contents: write  # 需要写入权限来创建releases
+  packages: write  # 可能需要的包权限
+  actions: read    # 读取actions
+
 jobs:
   build:
     runs-on: ubuntu-latest
