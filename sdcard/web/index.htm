@@ -3,111 +3,1090 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RMinte RM-01 板载网络监控系统</title>
-    <link rel="stylesheet" href="style.css">
+    <title>RM-01 监控面板</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .connection-status {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: white;
+            text-align: center;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-connected { background-color: #4CAF50; }
+        .status-connecting { background-color: #FF9800; }
+        .status-disconnected { background-color: #f44336; }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.18);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .card-icon {
+            font-size: 1.5rem;
+            margin-right: 10px;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+            padding: 8px 0;
+        }
+
+        .metric-label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .metric-value {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .cpu-cores {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .cpu-core {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 8px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+
+        .cpu-core-id {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 2px;
+        }
+
+        .cpu-core-usage {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .cpu-core-freq {
+            font-size: 0.7rem;
+            color: #888;
+        }
+
+        .temperature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .lpmu-temperature-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .disk-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .disk-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+
+        .disk-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .disk-usage {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 4px;
+        }
+
+        .disk-details {
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .temp-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+
+        .temp-label {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .temp-value {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .no-data {
+            text-align: center;
+            color: #888;
+            font-style: italic;
+            padding: 20px;
+        }
+
+        .system-section {
+            margin-bottom: 40px;
+        }
+
+        .system-header {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            color: white;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .system-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .system-header p {
+            margin: 5px 0 0 0;
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+
+        .lpmu-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .lpmu-row-1 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            grid-column: 1 / -1;
+        }
+
+        .lpmu-row-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            grid-column: 1 / -1;
+        }
+
+        .lpmu-full-width {
+            grid-column: 1 / -1;
+        }
+
+        @media (max-width: 1200px) {
+            .lpmu-temperature-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .disk-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+
+            .lpmu-dashboard,
+            .lpmu-row-1,
+            .lpmu-row-2 {
+                grid-template-columns: 1fr;
+            }
+
+            .temperature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .lpmu-temperature-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .disk-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .system-header h2 {
+                font-size: 1.3rem;
+            }
+        }
+    </style>
 </head>
 <body>
-    <div class="header">
-        <div class="container">
-            <h1>RMinte RM-01 板载网络监控系统</h1>
-        </div>
-    </div>
-    
     <div class="container">
-        <button id="refresh" class="refresh-button">刷新数据</button>
-        <div id="timestamp">上次更新时间: -</div>
-        <div id="status-container"></div>
-        
-        <footer>
-           RMinte RM-01 板载网络监控系统 &copy; 2025
-        </footer>
+        <div class="header">
+            <h1>RM-01 Dashboard</h1>
+            <p>Rack on board 实时系统性能监控面板</p>
+        </div>
+
+        <div class="connection-status">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <span class="status-indicator status-connecting" id="agxStatusIndicator"></span>
+                    <span id="agxStatusText">正在连接到 AGX...</span>
+                </div>
+                <div>
+                    <span class="status-indicator status-connecting" id="lpmuStatusIndicator"></span>
+                    <span id="lpmuStatusText">正在连接到 LPMu...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- AGX 监控部分 -->
+        <div class="system-section">
+            <div class="system-header">
+                <h2>🖥️ AGX 监控</h2>
+                <p>NVIDIA 推理服务器系统状态</p>
+            </div>
+            
+            <div class="dashboard">
+                <!-- AGX CPU 监控卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🔥</div>
+                        <div class="card-title">CPU 监控</div>
+                    </div>
+                    <div id="cpuContent">
+                        <div class="no-data">等待数据...</div>
+                    </div>
+                </div>
+
+                <!-- AGX 内存监控卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">💾</div>
+                        <div class="card-title">内存监控</div>
+                    </div>
+                    <div id="memoryContent">
+                        <div class="no-data">等待数据...</div>
+                    </div>
+                </div>
+
+                <!-- AGX 温度监控卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🌡️</div>
+                        <div class="card-title">温度监控</div>
+                    </div>
+                    <div id="temperatureContent">
+                        <div class="no-data">等待数据...</div>
+                    </div>
+                </div>
+
+                <!-- AGX 功耗监控卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">⚡</div>
+                        <div class="card-title">功耗监控</div>
+                    </div>
+                    <div id="powerContent">
+                        <div class="no-data">等待数据...</div>
+                    </div>
+                </div>
+
+                <!-- AGX GPU 监控卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🎮</div>
+                        <div class="card-title">GPU 监控</div>
+                    </div>
+                    <div id="gpuContent">
+                        <div class="no-data">等待数据...</div>
+                    </div>
+                </div>
+
+                <!-- AGX 系统信息卡片 -->
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📊</div>
+                        <div class="card-title">系统信息</div>
+                    </div>
+                    <div id="systemContent">
+                        <div class="metric">
+                            <span class="metric-label">最后更新</span>
+                            <span class="metric-value" id="lastUpdate">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">连接时间</span>
+                            <span class="metric-value" id="connectionTime">-</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">数据包</span>
+                            <span class="metric-value" id="dataPackets">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- LattePanda Mu 监控部分 -->
+        <div class="system-section">
+            <div class="system-header">
+                <h2>💻 LattePanda Mu 监控</h2>
+                <p>LattePanda Mu X86 应用服务器系统状态</p>
+            </div>
+            
+            <div class="lpmu-dashboard">
+                <!-- 第一行：CPU、内存、系统信息 -->
+                <div class="lpmu-row-1">
+                    <!-- LPMu CPU 监控卡片 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">🖥️</div>
+                            <div class="card-title">CPU 监控</div>
+                        </div>
+                        <div id="lpmuCpuContent">
+                            <div class="no-data">等待数据...</div>
+                        </div>
+                    </div>
+
+                    <!-- LPMu 内存监控卡片 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">🧠</div>
+                            <div class="card-title">内存监控</div>
+                        </div>
+                        <div id="lpmuMemoryContent">
+                            <div class="no-data">等待数据...</div>
+                        </div>
+                    </div>
+
+                    <!-- LPMu 系统信息卡片 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon">📋</div>
+                            <div class="card-title">系统信息</div>
+                        </div>
+                        <div id="lpmuSystemContent">
+                            <div class="metric">
+                                <span class="metric-label">最后更新</span>
+                                <span class="metric-value" id="lpmuLastUpdate">-</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">连接时间</span>
+                                <span class="metric-value" id="lpmuConnectionTime">-</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">数据包</span>
+                                <span class="metric-value" id="lpmuDataPackets">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第二行：温度监控 -->
+                <div class="lpmu-row-2">
+                    <!-- LPMu 温度监控卡片 -->
+                    <div class="card lpmu-full-width">
+                        <div class="card-header">
+                            <div class="card-icon">🌡️</div>
+                            <div class="card-title">温度监控</div>
+                        </div>
+                        <div id="lpmuTemperatureContent">
+                            <div class="no-data">等待数据...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 第三行：磁盘监控 -->
+                <div class="lpmu-row-2">
+                    <!-- LPMu 磁盘监控卡片 -->
+                    <div class="card lpmu-full-width">
+                        <div class="card-header">
+                            <div class="card-icon">💽</div>
+                            <div class="card-title">磁盘监控</div>
+                        </div>
+                        <div id="lpmuDiskContent">
+                            <div class="no-data">等待数据...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        document.getElementById('refresh').addEventListener('click', fetchNetworkStatus);
-        
-        // 页面加载时获取数据
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchNetworkStatus();
-        });
-        
-        // 自动定期刷新
-        setInterval(fetchNetworkStatus, 1000); // 每1秒刷新一次网络状态
-        
-        function fetchNetworkStatus() {
-            fetch('/api/network')
-                .then(response => response.json())
-                .then(data => {
-                    updateStatusDisplay(data);
-                })
-                .catch(error => {
-                    console.error('获取网络状态失败:', error);
+        // WebSocket 连接管理
+        class AGXMonitor {
+            constructor() {
+                this.ws = null;
+                this.reconnectInterval = 3000;
+                this.maxReconnectAttempts = 5;
+                this.reconnectAttempts = 0;
+                this.connectionStartTime = null;
+                this.dataPacketCount = 0;
+                this.isConnecting = false;
+                
+                this.init();
+            }
+
+            init() {
+                this.connect();
+                this.startConnectionTimeUpdate();
+            }
+
+            connect() {
+                if (this.isConnecting) return;
+                
+                this.isConnecting = true;
+                this.updateConnectionStatus('connecting', '正在连接到 AGX 服务器...');
+
+                try {
+                    // 连接到 AGX 服务器的 WebSocket
+                    this.ws = new WebSocket('ws://10.10.99.98:58090/socket.io/?EIO=4&transport=websocket');
+                    
+                    this.ws.onopen = () => {
+                        console.log('WebSocket 连接已建立');
+                        this.isConnecting = false;
+                        this.reconnectAttempts = 0;
+                        this.connectionStartTime = new Date();
+                        this.updateConnectionStatus('connected', '已连接到 AGX 服务器');
+                        
+                        // 发送初始连接消息 (Socket.IO 握手)
+                        this.ws.send('40');
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        this.handleMessage(event.data);
+                    };
+
+                    this.ws.onclose = (event) => {
+                        console.log('WebSocket 连接已关闭:', event.code, event.reason);
+                        this.isConnecting = false;
+                        this.connectionStartTime = null;
+                        this.updateConnectionStatus('disconnected', '连接已断开');
+                        this.scheduleReconnect();
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('WebSocket 错误:', error);
+                        this.isConnecting = false;
+                        this.updateConnectionStatus('disconnected', '连接错误');
+                    };
+
+                } catch (error) {
+                    console.error('连接失败:', error);
+                    this.isConnecting = false;
+                    this.updateConnectionStatus('disconnected', '连接失败');
+                    this.scheduleReconnect();
+                }
+            }
+
+            handleMessage(data) {
+                console.log('收到消息:', data);
+                
+                // 处理 Socket.IO 消息格式
+                if (data.startsWith('42')) {
+                    try {
+                        // 解析 Socket.IO 数据包
+                        const jsonData = data.substring(2);
+                        const parsed = JSON.parse(jsonData);
+                        
+                        if (parsed[0] === 'tegrastats_update' && parsed[1]) {
+                            this.dataPacketCount++;
+                            this.updateSystemData(parsed[1]);
+                        }
+                    } catch (error) {
+                        console.error('解析消息失败:', error);
+                    }
+                } else if (data === '40') {
+                    // Socket.IO 握手确认
+                    console.log('Socket.IO 握手完成');
+                } else if (data.startsWith('2')) {
+                    // Ping frame - 回复 pong
+                    this.ws.send('3');
+                }
+            }
+
+            updateSystemData(data) {
+                console.log('更新系统数据:', data);
+                
+                // 更新 CPU 数据
+                this.updateCPUDisplay(data.cpu);
+                
+                // 更新内存数据
+                this.updateMemoryDisplay(data.memory);
+                
+                // 更新温度数据
+                this.updateTemperatureDisplay(data.temperature);
+                
+                // 更新功耗数据
+                this.updatePowerDisplay(data.power);
+                
+                // 更新 GPU 数据
+                this.updateGPUDisplay(data.gpu);
+                
+                // 更新最后更新时间
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('zh-CN');
+                document.getElementById('dataPackets').textContent = this.dataPacketCount;
+            }
+
+            updateCPUDisplay(cpuData) {
+                if (!cpuData || !cpuData.cores) return;
+                
+                const content = document.getElementById('cpuContent');
+                let html = '<div class="cpu-cores">';
+                
+                cpuData.cores.forEach(core => {
+                    html += `
+                        <div class="cpu-core">
+                            <div class="cpu-core-id">核心 ${core.id}</div>
+                            <div class="cpu-core-usage">${core.usage}%</div>
+                            <div class="cpu-core-freq">${core.freq}MHz</div>
+                        </div>
+                    `;
                 });
-        }
-        
-        function updateStatusDisplay(data) {
-            const container = document.getElementById('status-container');
-            container.innerHTML = '';
-            
-            // 更新时间戳
-            const timestamp = new Date(data.timestamp * 1000).toLocaleString();
-            document.getElementById('timestamp').textContent = '上次更新时间: ' + timestamp;
-            
-            // 更新每个目标的状态
-            data.targets.forEach(target => {
-                const statusClass = getStatusClass(target.status);
-                const indicatorClass = getIndicatorClass(target.status);
                 
-                const card = document.createElement('div');
-                card.className = 'status-card ' + statusClass;
+                html += '</div>';
+                content.innerHTML = html;
+            }
+
+            updateMemoryDisplay(memoryData) {
+                if (!memoryData) return;
                 
-                const statusIndicator = `<span class="status-indicator ${indicatorClass}"></span>`;
+                const content = document.getElementById('memoryContent');
+                let html = '';
                 
-                card.innerHTML = `
-                    <h3>${statusIndicator}${target.name} (${target.ip})</h3>
-                    <div class="status-details">
-                        <div class="status-item">
-                            <div class="status-label">状态</div>
-                            <div class="status-value">${getStatusText(target.status)}</div>
+                if (memoryData.ram) {
+                    const ramUsagePercent = ((memoryData.ram.used / memoryData.ram.total) * 100).toFixed(1);
+                    html += `
+                        <div class="metric">
+                            <span class="metric-label">RAM 使用率</span>
+                            <span class="metric-value">${ramUsagePercent}%</span>
                         </div>
-                        <div class="status-item">
-                            <div class="status-label">响应时间</div>
-                            <div class="status-value">${target.response_time} ms</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${ramUsagePercent}%">${ramUsagePercent}%</div>
                         </div>
-                        <div class="status-item">
-                            <div class="status-label">丢包率</div>
-                            <div class="status-value">${target.loss_rate.toFixed(1)}%</div>
+                        <div class="metric">
+                            <span class="metric-label">RAM</span>
+                            <span class="metric-value">${memoryData.ram.used}/${memoryData.ram.total} MB</span>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
                 
-                container.appendChild(card);
-            });
-        }
-        
-        function getStatusClass(status) {
-            switch(status) {
-                case 'UP': return 'status-up';
-                case 'DOWN': return 'status-down';
-                default: return 'status-unknown';
+                if (memoryData.swap) {
+                    const swapUsagePercent = memoryData.swap.total > 0 ? 
+                        ((memoryData.swap.used / memoryData.swap.total) * 100).toFixed(1) : 0;
+                    html += `
+                        <div class="metric">
+                            <span class="metric-label">SWAP</span>
+                            <span class="metric-value">${memoryData.swap.used}/${memoryData.swap.total} MB</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${swapUsagePercent}%">${swapUsagePercent}%</div>
+                        </div>
+                    `;
+                }
+                
+                content.innerHTML = html;
+            }
+
+            updateTemperatureDisplay(tempData) {
+                if (!tempData) return;
+                
+                const content = document.getElementById('temperatureContent');
+                let html = '<div class="temperature-grid">';
+                
+                const tempItems = [
+                    { label: 'CPU', value: tempData.cpu },
+                    { label: 'SoC 0', value: tempData.soc0 },
+                    { label: 'SoC 1', value: tempData.soc1 },
+                    { label: 'SoC 2', value: tempData.soc2 },
+                    { label: 'Junction', value: tempData.tj }
+                ];
+                
+                tempItems.forEach(item => {
+                    if (item.value !== undefined) {
+                        html += `
+                            <div class="temp-item">
+                                <div class="temp-label">${item.label}</div>
+                                <div class="temp-value">${item.value.toFixed(1)}°C</div>
+                            </div>
+                        `;
+                    }
+                });
+                
+                html += '</div>';
+                content.innerHTML = html;
+            }
+
+            updatePowerDisplay(powerData) {
+                if (!powerData) return;
+                
+                const content = document.getElementById('powerContent');
+                let html = '';
+                
+                const powerItems = [
+                    { label: 'GPU+SoC', data: powerData.gpu_soc },
+                    { label: 'CPU', data: powerData.cpu_cv },
+                    { label: '系统 5V', data: powerData.sys_5v },
+                    { label: 'RAM', data: powerData.ram }
+                ];
+                
+                powerItems.forEach(item => {
+                    if (item.data && item.data.current !== undefined) {
+                        html += `
+                            <div class="metric">
+                                <span class="metric-label">${item.label}</span>
+                                <span class="metric-value">${item.data.current} ${item.data.unit || 'mW'}</span>
+                            </div>
+                        `;
+                    }
+                });
+                
+                content.innerHTML = html;
+            }
+
+            updateGPUDisplay(gpuData) {
+                if (!gpuData) return;
+                
+                const content = document.getElementById('gpuContent');
+                let html = '';
+                
+                if (gpuData.gr3d_freq !== undefined) {
+                    html += `
+                        <div class="metric">
+                            <span class="metric-label">3D GPU 频率</span>
+                            <span class="metric-value">${gpuData.gr3d_freq}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${gpuData.gr3d_freq}%">${gpuData.gr3d_freq}%</div>
+                        </div>
+                    `;
+                }
+                
+                content.innerHTML = html || '<div class="no-data">暂无 GPU 数据</div>';
+            }
+
+            updateConnectionStatus(status, message) {
+                const indicator = document.getElementById('agxStatusIndicator');
+                const statusText = document.getElementById('agxStatusText');
+                
+                indicator.className = `status-indicator status-${status}`;
+                statusText.textContent = message;
+            }
+
+            scheduleReconnect() {
+                this.reconnectAttempts++;
+                const delay = this.reconnectInterval;
+                
+                setTimeout(() => {
+                    this.connect();
+                }, delay);
+            }
+
+            startConnectionTimeUpdate() {
+                setInterval(() => {
+                    if (this.connectionStartTime) {
+                        const duration = Math.floor((new Date() - this.connectionStartTime) / 1000);
+                        const minutes = Math.floor(duration / 60);
+                        const seconds = duration % 60;
+                        document.getElementById('connectionTime').textContent = 
+                            `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    } else {
+                        document.getElementById('connectionTime').textContent = '-';
+                    }
+                }, 1000);
             }
         }
-        
-        function getIndicatorClass(status) {
-            switch(status) {
-                case 'UP': return 'indicator-up';
-                case 'DOWN': return 'indicator-down';
-                default: return 'indicator-unknown';
+
+        // LPMu 监控类
+        class LPMuMonitor {
+            constructor() {
+                this.ws = null;
+                this.reconnectInterval = 3000;
+                this.maxReconnectAttempts = 5;
+                this.reconnectAttempts = 0;
+                this.connectionStartTime = null;
+                this.dataPacketCount = 0;
+                this.isConnecting = false;
+                
+                this.init();
+            }
+
+            init() {
+                this.connect();
+                this.startConnectionTimeUpdate();
+            }
+
+            connect() {
+                if (this.isConnecting) return;
+                
+                this.isConnecting = true;
+                this.updateConnectionStatus('connecting', '正在连接到 LPMu 服务器...');
+
+                try {
+                    // 连接到 LPMu 服务器的 WebSocket (Socket.IO)
+                    this.ws = new WebSocket('ws://10.10.99.99:59090/socket.io/?EIO=4&transport=websocket');
+                    
+                    this.ws.onopen = () => {
+                        console.log('LPMu WebSocket 连接已建立');
+                        this.isConnecting = false;
+                        this.reconnectAttempts = 0;
+                        this.connectionStartTime = new Date();
+                        this.updateConnectionStatus('connected', '已连接到 LPMu 服务器');
+                        
+                        // 发送初始连接消息 (Socket.IO 握手)
+                        this.ws.send('40');
+                    };
+
+                    this.ws.onmessage = (event) => {
+                        this.handleMessage(event.data);
+                    };
+
+                    this.ws.onclose = (event) => {
+                        console.log('LPMu WebSocket 连接已关闭:', event.code, event.reason);
+                        this.isConnecting = false;
+                        this.connectionStartTime = null;
+                        this.updateConnectionStatus('disconnected', 'LPMu 连接已断开');
+                        this.scheduleReconnect();
+                    };
+
+                    this.ws.onerror = (error) => {
+                        console.error('LPMu WebSocket 错误:', error);
+                        this.isConnecting = false;
+                        this.updateConnectionStatus('disconnected', 'LPMu 连接错误');
+                    };
+
+                } catch (error) {
+                    console.error('LPMu 连接失败:', error);
+                    this.isConnecting = false;
+                    this.updateConnectionStatus('disconnected', 'LPMu 连接失败');
+                    this.scheduleReconnect();
+                }
+            }
+
+            handleMessage(data) {
+                console.log('LPMu 收到消息:', data);
+                
+                // 处理 Socket.IO 消息格式
+                if (data.startsWith('42')) {
+                    try {
+                        // 解析 Socket.IO 数据包
+                        const jsonData = data.substring(2);
+                        const parsed = JSON.parse(jsonData);
+                        
+                        if (parsed[0] === 'lpmu_status_update' && parsed[1]) {
+                            this.dataPacketCount++;
+                            this.updateSystemData(parsed[1]);
+                        }
+                    } catch (error) {
+                        console.error('LPMu 解析消息失败:', error);
+                    }
+                } else if (data === '40') {
+                    // Socket.IO 握手确认
+                    console.log('LPMu Socket.IO 握手完成');
+                } else if (data.startsWith('2')) {
+                    // Ping frame - 回复 pong
+                    this.ws.send('3');
+                }
+            }
+
+            updateSystemData(data) {
+                console.log('更新 LPMu 系统数据:', data);
+                
+                // 更新 CPU 数据
+                this.updateCPUDisplay(data.cpu);
+                
+                // 更新内存数据
+                this.updateMemoryDisplay(data.memory);
+                
+                // 更新温度数据
+                this.updateTemperatureDisplay(data.temperature);
+                
+                // 更新磁盘数据
+                this.updateDiskDisplay(data.disk);
+                
+                // 更新最后更新时间
+                document.getElementById('lpmuLastUpdate').textContent = new Date().toLocaleTimeString('zh-CN');
+                document.getElementById('lpmuDataPackets').textContent = this.dataPacketCount;
+            }
+
+            updateCPUDisplay(cpuData) {
+                if (!cpuData) return;
+                
+                const content = document.getElementById('lpmuCpuContent');
+                let html = '';
+                
+                // 平均 CPU 使用率
+                if (cpuData.avg_usage !== undefined) {
+                    html += `
+                        <div class="metric">
+                            <span class="metric-label">平均使用率</span>
+                            <span class="metric-value">${cpuData.avg_usage.toFixed(1)}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${cpuData.avg_usage}%">${cpuData.avg_usage.toFixed(1)}%</div>
+                        </div>
+                    `;
+                }
+                
+                // CPU 核心信息
+                if (cpuData.cores && cpuData.cores.length > 0) {
+                    html += '<div class="cpu-cores">';
+                    cpuData.cores.forEach(core => {
+                        html += `
+                            <div class="cpu-core">
+                                <div class="cpu-core-id">核心 ${core.id}</div>
+                                <div class="cpu-core-usage">${core.usage.toFixed(1)}%</div>
+                                <div class="cpu-core-freq">${core.freq}MHz</div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                }
+                
+                content.innerHTML = html || '<div class="no-data">暂无 CPU 数据</div>';
+            }
+
+            updateMemoryDisplay(memoryData) {
+                if (!memoryData) return;
+                
+                const content = document.getElementById('lpmuMemoryContent');
+                let html = '';
+                
+                if (memoryData.ram) {
+                    html += `
+                        <div class="metric">
+                            <span class="metric-label">RAM 使用率</span>
+                            <span class="metric-value">${memoryData.ram.percent.toFixed(1)}%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${memoryData.ram.percent}%">${memoryData.ram.percent.toFixed(1)}%</div>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">RAM</span>
+                            <span class="metric-value">${memoryData.ram.used}/${memoryData.ram.total} ${memoryData.ram.unit}</span>
+                        </div>
+                    `;
+                }
+                
+                if (memoryData.swap) {
+                    html += `
+                        <div class="metric">
+                            <span class="metric-label">SWAP</span>
+                            <span class="metric-value">${memoryData.swap.used}/${memoryData.swap.total} ${memoryData.swap.unit}</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${memoryData.swap.percent}%">${memoryData.swap.percent.toFixed(1)}%</div>
+                        </div>
+                    `;
+                }
+                
+                content.innerHTML = html || '<div class="no-data">暂无内存数据</div>';
+            }
+
+            updateTemperatureDisplay(tempData) {
+                if (!tempData) return;
+                
+                const content = document.getElementById('lpmuTemperatureContent');
+                let html = '<div class="lpmu-temperature-grid">';
+                
+                // 遍历所有温度传感器
+                Object.keys(tempData).forEach(key => {
+                    const temp = tempData[key];
+                    if (typeof temp === 'number') {
+                        html += `
+                            <div class="temp-item">
+                                <div class="temp-label">${key}</div>
+                                <div class="temp-value">${temp.toFixed(1)}°C</div>
+                            </div>
+                        `;
+                    }
+                });
+                
+                html += '</div>';
+                content.innerHTML = html;
+            }
+
+            updateDiskDisplay(diskData) {
+                if (!diskData) return;
+                
+                const content = document.getElementById('lpmuDiskContent');
+                let html = '<div class="disk-grid">';
+                
+                // 遍历所有磁盘
+                Object.keys(diskData).forEach(key => {
+                    const disk = diskData[key];
+                    if (disk && disk.percent !== undefined) {
+                        html += `
+                            <div class="disk-item">
+                                <div class="disk-label">${key}</div>
+                                <div class="disk-usage">${disk.percent.toFixed(1)}%</div>
+                                <div class="progress-bar" style="margin: 8px 0;">
+                                    <div class="progress-fill" style="width: ${disk.percent}%"></div>
+                                </div>
+                                <div class="disk-details">${disk.used}/${disk.total} ${disk.unit}</div>
+                                <div class="disk-details">${disk.mountpoint || ''}</div>
+                            </div>
+                        `;
+                    }
+                });
+                
+                html += '</div>';
+                content.innerHTML = html;
+            }
+
+            updateConnectionStatus(status, message) {
+                const indicator = document.getElementById('lpmuStatusIndicator');
+                const statusText = document.getElementById('lpmuStatusText');
+                
+                indicator.className = `status-indicator status-${status}`;
+                statusText.textContent = message;
+            }
+
+            scheduleReconnect() {
+                this.reconnectAttempts++;
+                const delay = this.reconnectInterval;
+                
+                setTimeout(() => {
+                    this.connect();
+                }, delay);
+            }
+
+            startConnectionTimeUpdate() {
+                setInterval(() => {
+                    if (this.connectionStartTime) {
+                        const duration = Math.floor((new Date() - this.connectionStartTime) / 1000);
+                        const minutes = Math.floor(duration / 60);
+                        const seconds = duration % 60;
+                        document.getElementById('lpmuConnectionTime').textContent = 
+                            `${minutes}:${seconds.toString().padStart(2, '0')}`;
+                    } else {
+                        document.getElementById('lpmuConnectionTime').textContent = '-';
+                    }
+                }, 1000);
             }
         }
-        
-        function getStatusText(status) {
-            switch(status) {
-                case 'UP': return '已连接';
-                case 'DOWN': return '已断开';
-                default: return '未知';
-            }
-        }
+
+        // 页面加载完成后初始化监控
+        document.addEventListener('DOMContentLoaded', () => {
+            new AGXMonitor();
+            new LPMuMonitor();
+        });
     </script>
 </body>
 </html>
