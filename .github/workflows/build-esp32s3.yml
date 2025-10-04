@@ -9,7 +9,7 @@ on:
   workflow_dispatch:  # 允许手动触发
 
 env:
-  IDF_VERSION: 'v5.2.2'  # 使用更稳定的ESP-IDF版本
+  IDF_VERSION: 'v5.5.1'  # 与开发环境保持一致的ESP-IDF版本
   PROJECT_NAME: 'robOS'
 
 jobs:
@@ -239,7 +239,7 @@ jobs:
           ### 📊 Build Info
           
           - **Target**: ESP32S3
-          - **ESP-IDF Version**: ${{ env.IDF_VERSION }}
+          - **ESP-IDF Version**: v5.5.1
           - **Build Date**: ${{ github.event.head_commit.timestamp }}
           - **Git Commit**: ${{ github.sha }}
           
