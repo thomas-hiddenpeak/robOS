@@ -82,16 +82,45 @@ robOS/
 
 ## 板上机柜设备
 
-1. 板载 LED GPIO 42，28颗WS2812阵列
-2. 触控 LED GPIO 45，1颗状态指示WS2812
-3. 矩阵 LED GPIO 9 32x32 WS2812矩阵 (1024颗LED)
-4. GPIO 41 控制风扇PWM信号 25kHz PWM频率，10位分辨率
-5. USB MUX控制 ,GPIO 8 - USB MUX1选择控制,GPIO 48 - USB MUX2选择控制
-6. 以太网控制器 (W5500) 
-7. TF卡存储 
-8. 供电电压监测
-9. 供电芯片
+1. **板载 LED**: GPIO 42，28颗WS2812阵列 - 系统状态指示和装饰照明
+2. **触控 LED**: GPIO 45，1颗状态指示WS2812 - 用户交互反馈
+3. **矩阵 LED**: GPIO 9，32x32 WS2812矩阵 (1024颗LED) - 显示屏和图形界面
+4. **风扇控制**: GPIO 41，25kHz PWM频率，10位分辨率 - 智能温控散热
+5. **USB MUX控制**: GPIO 8/48 - 多设备USB接口切换
+6. **以太网控制器**: W5500 - 网络通信和管理
+7. **TF卡存储**: 配置文件和数据存储
+8. **供电电压监测**: 实时电源状态监控
+9. **供电芯片**: 电源管理和保护
 
+## 🎨 LED 系统架构
+
+robOS 配备了三个独立的 LED 子系统，每个都有专门的用途和完整的控制接口：
+
+### 1. Touch LED (触摸 LED)
+- **硬件**: GPIO 45，单颗 WS2812 LED
+- **用途**: 用户交互反馈，系统状态指示
+- **特性**: 触摸检测、全彩显示、多种动画模式
+- **控制**: `led touch` 命令系列
+
+### 2. Board LED (板载 LED)
+- **硬件**: GPIO 42，28颗 WS2812 LED 灯带
+- **用途**: 系统装饰照明，环境氛围营造
+- **特性**: 独立像素控制、丰富动画效果、亮度调节
+- **控制**: `led board` 命令系列
+
+### 3. Matrix LED (矩阵 LED)
+- **硬件**: GPIO 9，32x32 WS2812 LED 矩阵 (1024颗)
+- **用途**: 图形显示、信息展示、数据可视化
+- **特性**: 像素级绘图、图像导入导出、动画播放、SD卡存储
+- **控制**: `led matrix` 命令系列
+
+### LED 系统特性
+- **全彩支持**: 每个 LED 支持 1677万色彩 (RGB 24位)
+- **独立控制**: 三个子系统完全独立，可同时运行不同效果
+- **配置持久化**: 所有设置自动保存到 NVS 闪存
+- **颜色校正**: 统一的颜色校正系统，支持亮度和饱和度调节
+- **文件支持**: Matrix LED 支持图像文件导入导出 (SD卡)
+- **线程安全**: 支持多任务环境下的安全操作
 
 ## 主要功能
 
@@ -889,6 +918,29 @@ fan status              # 查看风扇响应
 temp auto               # 切换回自动模式
 ```
 
+### 5. LED 系统快速体验
+```bash
+# 触摸 LED - 用户交互指示
+led touch set blue                    # 设置触摸LED为蓝色
+led touch animation start rainbow 100 # 启动彩虹动画
+
+# 板载 LED - 系统装饰照明
+led board all 255 100 0              # 设置所有板载LED为橙色
+led board anim breathe 0 255 0 50     # 启动绿色呼吸动画
+
+# 矩阵 LED - 图形显示
+led matrix fill 255 0 255            # 矩阵填充紫色
+led matrix draw circle 16 16 8 255 255 0 fill  # 画一个黄色实心圆
+led matrix anim wave 60               # 启动波浪动画
+```
+
+### 6. LED 配置保存
+```bash
+led touch config save               # 保存触摸LED配置
+led board config save               # 保存板载LED配置  
+led matrix config save              # 保存矩阵LED配置
+```
+
 ## 📋 命令参考
 
 ### 🌡️ 温度管理命令
@@ -928,13 +980,80 @@ temp auto               # 切换回自动模式
 | `gpio <pin> input` | 设置为输入模式 | `gpio 42 input` |
 | `usbmux <target>` | 切换USB MUX | `usbmux agx` |
 
-### 🎨 Matrix LED命令
+### 🎨 LED 控制命令
+
+robOS 系统包含三个 LED 子系统，每个都有独立的控制命令：
+
+#### 🔸 Touch LED 命令 (单个 WS2812 触摸 LED)
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `led touch status` | 显示 LED 状态和配置 | `led touch status` |
+| `led touch help` | 显示完整命令参考 | `led touch help` |
+| `led touch set <color>` | 设置颜色 | `led touch set red` |
+| `led touch set <RRGGBB>` | 使用 RGB 十六进制设置 | `led touch set FF6600` |
+| `led touch brightness <0-255>` | 设置亮度 | `led touch brightness 128` |
+| `led touch clear` | 关闭 LED | `led touch clear` |
+| `led touch animation start <type> [speed] [color]` | 启动动画 | `led touch animation start rainbow 100` |
+| `led touch animation stop` | 停止动画 | `led touch animation stop` |
+| `led touch sensor threshold <value>` | 设置触摸阈值 | `led touch sensor threshold 500` |
+| `led touch sensor enable/disable` | 启用/禁用触摸检测 | `led touch sensor enable` |
+| `led touch config save/load/reset` | 配置管理 | `led touch config save` |
+
+**动画类型**: `rainbow`, `breathe`, `fade`, `pulse`, `sparkle`
+
+#### 🔸 Board LED 命令 (28颗 WS2812 板载 LED)
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `led board help` | 显示帮助信息 | `led board help` |
+| `led board on` | 打开所有 LED（白色） | `led board on` |
+| `led board off` | 关闭所有 LED | `led board off` |
+| `led board clear` | 清除所有 LED | `led board clear` |
+| `led board all <R> <G> <B>` | 设置所有 LED 颜色 | `led board all 255 0 0` |
+| `led board set <index> <R> <G> <B>` | 设置特定 LED 颜色 | `led board set 5 0 255 0` |
+| `led board brightness <0-255>` | 设置亮度 | `led board brightness 100` |
+| `led board anim stop` | 停止动画 | `led board anim stop` |
+| `led board anim fade <R> <G> <B> [speed]` | 淡入淡出动画 | `led board anim fade 255 0 0 50` |
+| `led board anim rainbow [speed]` | 彩虹动画 | `led board anim rainbow 80` |
+| `led board anim breathe <R> <G> <B> [speed]` | 呼吸动画 | `led board anim breathe 0 0 255 30` |
+| `led board anim wave <R> <G> <B> [speed]` | 波浪动画 | `led board anim wave 255 255 0 60` |
+| `led board anim chase <R> <G> <B> [speed]` | 追逐动画 | `led board anim chase 255 0 255 70` |
+| `led board anim twinkle <R> <G> <B> [speed]` | 闪烁动画 | `led board anim twinkle 255 255 255 40` |
+| `led board anim fire [speed]` | 火焰动画 | `led board anim fire 50` |
+| `led board anim pulse <R> <G> <B> [speed]` | 脉冲动画 | `led board anim pulse 0 255 0 80` |
+| `led board anim gradient <R1> <G1> <B1> <R2> <G2> <B2> [speed]` | 渐变动画 | `led board anim gradient 255 0 0 0 0 255 60` |
+| `led board config save/load/reset` | 配置管理 | `led board config save` |
+
+#### 🔸 Matrix LED 命令 (32x32 WS2812 LED 矩阵)
 | 命令 | 说明 | 示例 |
 |------|------|------|
 | `led matrix status` | 显示矩阵状态 | `led matrix status` |
-| `led matrix fill <r> <g> <b>` | 填充颜色 | `led matrix fill 255 0 0` |
-| `led matrix clear` | 清空显示 | `led matrix clear` |
-| `led matrix animation <type>` | 播放动画 | `led matrix animation rainbow` |
+| `led matrix help` | 显示完整帮助 | `led matrix help` |
+| `led matrix enable <on/off>` | 启用/禁用矩阵 | `led matrix enable on` |
+| `led matrix brightness <0-100>` | 设置亮度百分比 | `led matrix brightness 80` |
+| `led matrix clear` | 清除所有像素 | `led matrix clear` |
+| `led matrix fill <r> <g> <b>` | 用颜色填充 | `led matrix fill 255 0 0` |
+| `led matrix pixel <x> <y> <r> <g> <b>` | 设置单个像素 | `led matrix pixel 16 16 0 255 0` |
+| `led matrix test` | 显示测试图案 | `led matrix test` |
+| `led matrix draw line <x0> <y0> <x1> <y1> <r> <g> <b>` | 画线 | `led matrix draw line 0 0 31 31 255 255 0` |
+| `led matrix draw rect <x> <y> <w> <h> <r> <g> <b> [fill]` | 画矩形 | `led matrix draw rect 10 10 12 8 0 255 255 fill` |
+| `led matrix draw circle <x> <y> <radius> <r> <g> <b> [fill]` | 画圆 | `led matrix draw circle 16 16 8 255 0 255` |
+| `led matrix anim <type> [speed]` | 启动动画 | `led matrix anim rainbow 60` |
+| `led matrix stop` | 停止动画 | `led matrix stop` |
+| `led matrix mode <static/animation/off>` | 设置显示模式 | `led matrix mode animation` |
+| `led matrix config save/load/export/import` | 配置管理 | `led matrix config save` |
+| `led matrix image export <file>` | 导出当前显示 | `led matrix image export /sdcard/image.json` |
+| `led matrix image import <file> [name]` | 导入图像文件 | `led matrix image import /sdcard/image.json logo` |
+| `led matrix storage status` | 检查 SD 卡状态 | `led matrix storage status` |
+
+**矩阵动画类型**: `rainbow`, `wave`, `breathe`, `rotate`, `fade`
+
+#### 🔸 颜色校正命令
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `color brightness <factor>` | 设置亮度校正系数 | `color brightness 1.2` |
+| `color saturation <factor>` | 设置饱和度校正系数 | `color saturation 1.1` |
+| `color export <file>` | 导出颜色配置 | `color export /sdcard/color.json` |
+| `color import <file>` | 导入颜色配置 | `color import /sdcard/color.json` |
 
 ### 🔧 系统命令
 | 命令 | 说明 | 示例 |
@@ -952,6 +1071,11 @@ temp auto               # 切换回自动模式
 - **[温度集成指南](docs/TEMPERATURE_INTEGRATION_GUIDE.md)** - AGX温度集成到风扇控制的完整使用指南
 - **[智能安全温度策略](docs/SMART_SAFETY_TEMPERATURE_STRATEGY.md)** - 分层安全温度保护机制详解
 
+### LED 系统文档
+- **[Touch LED 组件](components/touch_led/README.md)** - 触摸LED详细使用指南和API文档
+- **[Matrix LED 组件](components/matrix_led/README.md)** - 32x32 LED矩阵控制和图形编程文档
+- **[Board LED 组件](components/board_led/)** - 板载LED灯带控制和动画效果文档
+
 ### 开发技术文档
 - **[项目进度记录](docs/PROJECT_PROGRESS.md)** - 详细的开发进度和完成状态
 - **[技术架构文档](docs/TECHNICAL_ARCHITECTURE.md)** - 系统架构设计和技术决策
@@ -966,5 +1090,5 @@ temp auto               # 切换回自动模式
 ---
 
 **项目版本**: robOS v2.0.0  
-**更新日期**: 2025年10月4日  
+**更新日期**: 2025年10月5日  
 **开发团队**: robOS Team
