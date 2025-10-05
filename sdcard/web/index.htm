@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RM-01 监控面板</title>
+    <title>RM - 01 监控面板</title>
     <style>
         * {
             margin: 0;
@@ -13,10 +13,11 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #59d5f6 0%, #c386f4 50%, #ff9fc1 100%);
             min-height: 100vh;
             color: #333;
         }
+        
 
         .container {
             max-width: 1200px;
@@ -338,35 +339,35 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>RM-01 Dashboard</h1>
-            <p>Rack on board 实时系统性能监控面板</p>
+            <h1>RM - 01 Dashboard</h1>
+            <p>RobOS ( Rack on board ) 实时系统性能监控面板</p>
         </div>
 
         <div class="connection-status">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <div>
                     <span class="status-indicator status-connecting" id="agxStatusIndicator"></span>
-                    <span id="agxStatusText">正在连接到 AGX...</span>
+                    <span id="agxStatusText">正在连接到 推理服务器...</span>
                 </div>
                 <div>
                     <span class="status-indicator status-connecting" id="lpmuStatusIndicator"></span>
-                    <span id="lpmuStatusText">正在连接到 LPMu...</span>
+                    <span id="lpmuStatusText">正在连接到 应用服务器...</span>
                 </div>
             </div>
         </div>
 
-        <!-- AGX 监控部分 -->
+        <!-- 推理服务器 监控部分 -->
         <div class="system-section">
             <div class="system-header">
-                <h2>🖥️ AGX 监控</h2>
+                <h2>🖥️ 推理模组监控</h2>
                 <p>NVIDIA 推理服务器系统状态</p>
             </div>
             
             <div class="dashboard">
-                <!-- AGX CPU 监控卡片 -->
+                <!-- 推理服务器 CPU 监控卡片 -->
                 <div class="card">
                     <div class="card-header">
-                        <div class="card-icon">🔥</div>
+                        <div class="card-icon"> </div>
                         <div class="card-title">CPU 监控</div>
                     </div>
                     <div id="cpuContent">
@@ -374,21 +375,21 @@
                     </div>
                 </div>
 
-                <!-- AGX 内存监控卡片 -->
+                <!-- 推理服务器 内存监控卡片 -->
                 <div class="card">
                     <div class="card-header">
-                        <div class="card-icon">💾</div>
-                        <div class="card-title">内存监控</div>
+                        <div class="card-icon"> </div>
+                        <div class="card-title">显存监控</div>
                     </div>
                     <div id="memoryContent">
                         <div class="no-data">等待数据...</div>
                     </div>
                 </div>
 
-                <!-- AGX 温度监控卡片 -->
+                <!-- 推理服务器 温度监控卡片 -->
                 <div class="card">
                     <div class="card-header">
-                        <div class="card-icon">🌡️</div>
+                        <div class="card-icon"> </div>
                         <div class="card-title">温度监控</div>
                     </div>
                     <div id="temperatureContent">
@@ -396,10 +397,10 @@
                     </div>
                 </div>
 
-                <!-- AGX 功耗监控卡片 -->
+                <!-- 推理服务器 功耗监控卡片 -->
                 <div class="card">
                     <div class="card-header">
-                        <div class="card-icon">⚡</div>
+                        <div class="card-icon"> </div>
                         <div class="card-title">功耗监控</div>
                     </div>
                     <div id="powerContent">
@@ -407,10 +408,10 @@
                     </div>
                 </div>
 
-                <!-- AGX GPU 监控卡片 -->
+                <!-- 推理服务器 GPU 监控卡片 -->
                 <div class="card">
                     <div class="card-header">
-                        <div class="card-icon">🎮</div>
+                        <div class="card-icon"> </div>
                         <div class="card-title">GPU 监控</div>
                     </div>
                     <div id="gpuContent">
@@ -418,10 +419,10 @@
                     </div>
                 </div>
 
-                <!-- AGX 系统信息卡片 -->
+                <!-- 推理服务器 系统信息卡片 -->
                 <div class="card">
                     <div class="card-header">
-                        <div class="card-icon">📊</div>
+                        <div class="card-icon"> </div>
                         <div class="card-title">系统信息</div>
                     </div>
                     <div id="systemContent">
@@ -445,17 +446,17 @@
         <!-- LattePanda Mu 监控部分 -->
         <div class="system-section">
             <div class="system-header">
-                <h2>💻 LattePanda Mu 监控</h2>
-                <p>LattePanda Mu X86 应用服务器系统状态</p>
+                <h2>🖥️ 应用模组监控</h2>
+                <p>Intel X86 应用服务器系统状态</p>
             </div>
             
             <div class="lpmu-dashboard">
                 <!-- 第一行：CPU、内存、系统信息 -->
                 <div class="lpmu-row-1">
-                    <!-- LPMu CPU 监控卡片 -->
+                    <!-- 应用服务器 CPU 监控卡片 -->
                     <div class="card">
                         <div class="card-header">
-                            <div class="card-icon">🖥️</div>
+                            <div class="card-icon"> </div>
                             <div class="card-title">CPU 监控</div>
                         </div>
                         <div id="lpmuCpuContent">
@@ -463,10 +464,10 @@
                         </div>
                     </div>
 
-                    <!-- LPMu 内存监控卡片 -->
+                    <!-- 应用服务器 内存监控卡片 -->
                     <div class="card">
                         <div class="card-header">
-                            <div class="card-icon">🧠</div>
+                            <div class="card-icon"> </div>
                             <div class="card-title">内存监控</div>
                         </div>
                         <div id="lpmuMemoryContent">
@@ -474,10 +475,10 @@
                         </div>
                     </div>
 
-                    <!-- LPMu 系统信息卡片 -->
+                    <!-- 应用服务器 系统信息卡片 -->
                     <div class="card">
                         <div class="card-header">
-                            <div class="card-icon">📋</div>
+                            <div class="card-icon"> </div>
                             <div class="card-title">系统信息</div>
                         </div>
                         <div id="lpmuSystemContent">
@@ -499,10 +500,10 @@
 
                 <!-- 第二行：温度监控 -->
                 <div class="lpmu-row-2">
-                    <!-- LPMu 温度监控卡片 -->
+                    <!-- 应用服务器 温度监控卡片 -->
                     <div class="card lpmu-full-width">
                         <div class="card-header">
-                            <div class="card-icon">🌡️</div>
+                            <div class="card-icon"> </div>
                             <div class="card-title">温度监控</div>
                         </div>
                         <div id="lpmuTemperatureContent">
@@ -513,10 +514,10 @@
 
                 <!-- 第三行：磁盘监控 -->
                 <div class="lpmu-row-2">
-                    <!-- LPMu 磁盘监控卡片 -->
+                    <!-- 应用服务器 磁盘监控卡片 -->
                     <div class="card lpmu-full-width">
                         <div class="card-header">
-                            <div class="card-icon">💽</div>
+                            <div class="card-icon"> </div>
                             <div class="card-title">磁盘监控</div>
                         </div>
                         <div id="lpmuDiskContent">
@@ -530,7 +531,7 @@
 
     <script>
         // WebSocket 连接管理
-        class AGXMonitor {
+        class 推理服务器Monitor {
             constructor() {
                 this.ws = null;
                 this.reconnectInterval = 3000;
@@ -552,10 +553,10 @@
                 if (this.isConnecting) return;
                 
                 this.isConnecting = true;
-                this.updateConnectionStatus('connecting', '正在连接到 AGX 服务器...');
+                this.updateConnectionStatus('connecting', '正在连接到 推理服务器...');
 
                 try {
-                    // 连接到 AGX 服务器的 WebSocket
+                    // 连接到 推理服务器 服务器的 WebSocket
                     this.ws = new WebSocket('ws://10.10.99.98:58090/socket.io/?EIO=4&transport=websocket');
                     
                     this.ws.onopen = () => {
@@ -563,7 +564,7 @@
                         this.isConnecting = false;
                         this.reconnectAttempts = 0;
                         this.connectionStartTime = new Date();
-                        this.updateConnectionStatus('connected', '已连接到 AGX 服务器');
+                        this.updateConnectionStatus('connected', '已连接到 推理服务器 服务器');
                         
                         // 发送初始连接消息 (Socket.IO 握手)
                         this.ws.send('40');
@@ -813,8 +814,8 @@
             }
         }
 
-        // LPMu 监控类
-        class LPMuMonitor {
+        // 应用服务器 监控类
+        class 应用服务器Monitor {
             constructor() {
                 this.ws = null;
                 this.reconnectInterval = 3000;
@@ -836,18 +837,18 @@
                 if (this.isConnecting) return;
                 
                 this.isConnecting = true;
-                this.updateConnectionStatus('connecting', '正在连接到 LPMu 服务器...');
+                this.updateConnectionStatus('connecting', '正在连接到 应用服务器...');
 
                 try {
-                    // 连接到 LPMu 服务器的 WebSocket (Socket.IO)
+                    // 连接到 应用服务器 服务器的 WebSocket (Socket.IO)
                     this.ws = new WebSocket('ws://10.10.99.99:59090/socket.io/?EIO=4&transport=websocket');
                     
                     this.ws.onopen = () => {
-                        console.log('LPMu WebSocket 连接已建立');
+                        console.log('应用服务器 WebSocket 连接已建立');
                         this.isConnecting = false;
                         this.reconnectAttempts = 0;
                         this.connectionStartTime = new Date();
-                        this.updateConnectionStatus('connected', '已连接到 LPMu 服务器');
+                        this.updateConnectionStatus('connected', '已连接到 应用服务器 服务器');
                         
                         // 发送初始连接消息 (Socket.IO 握手)
                         this.ws.send('40');
@@ -858,29 +859,29 @@
                     };
 
                     this.ws.onclose = (event) => {
-                        console.log('LPMu WebSocket 连接已关闭:', event.code, event.reason);
+                        console.log('应用服务器 WebSocket 连接已关闭:', event.code, event.reason);
                         this.isConnecting = false;
                         this.connectionStartTime = null;
-                        this.updateConnectionStatus('disconnected', 'LPMu 连接已断开');
+                        this.updateConnectionStatus('disconnected', '应用服务器 连接已断开');
                         this.scheduleReconnect();
                     };
 
                     this.ws.onerror = (error) => {
-                        console.error('LPMu WebSocket 错误:', error);
+                        console.error('应用服务器 WebSocket 错误:', error);
                         this.isConnecting = false;
-                        this.updateConnectionStatus('disconnected', 'LPMu 连接错误');
+                        this.updateConnectionStatus('disconnected', '应用服务器 连接错误');
                     };
 
                 } catch (error) {
-                    console.error('LPMu 连接失败:', error);
+                    console.error('应用服务器 连接失败:', error);
                     this.isConnecting = false;
-                    this.updateConnectionStatus('disconnected', 'LPMu 连接失败');
+                    this.updateConnectionStatus('disconnected', '应用服务器 连接失败');
                     this.scheduleReconnect();
                 }
             }
 
             handleMessage(data) {
-                console.log('LPMu 收到消息:', data);
+                console.log('应用服务器 收到消息:', data);
                 
                 // 处理 Socket.IO 消息格式
                 if (data.startsWith('42')) {
@@ -894,11 +895,11 @@
                             this.updateSystemData(parsed[1]);
                         }
                     } catch (error) {
-                        console.error('LPMu 解析消息失败:', error);
+                        console.error('应用服务器 解析消息失败:', error);
                     }
                 } else if (data === '40') {
                     // Socket.IO 握手确认
-                    console.log('LPMu Socket.IO 握手完成');
+                    console.log('应用服务器 Socket.IO 握手完成');
                 } else if (data.startsWith('2')) {
                     // Ping frame - 回复 pong
                     this.ws.send('3');
@@ -906,7 +907,7 @@
             }
 
             updateSystemData(data) {
-                console.log('更新 LPMu 系统数据:', data);
+                console.log('更新 应用服务器 系统数据:', data);
                 
                 // 更新 CPU 数据
                 this.updateCPUDisplay(data.cpu);
@@ -1084,8 +1085,8 @@
 
         // 页面加载完成后初始化监控
         document.addEventListener('DOMContentLoaded', () => {
-            new AGXMonitor();
-            new LPMuMonitor();
+            new 推理服务器Monitor();
+            new 应用服务器Monitor();
         });
     </script>
 </body>
