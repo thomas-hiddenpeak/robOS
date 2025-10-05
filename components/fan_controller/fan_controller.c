@@ -14,6 +14,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "hardware_hal.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -44,6 +45,17 @@ typedef struct {
   fan_curve_point_t *curve_points;
   uint8_t num_curve_points;
   bool curve_enabled;
+
+  // Temperature hysteresis and rate limiting
+  float
+      last_stable_temperature; ///< Last temperature that triggered speed change
+  uint8_t target_speed_percent;       ///< Target speed from curve calculation
+  uint8_t last_applied_speed;         ///< Last actually applied speed
+  uint32_t last_speed_change_time;    ///< Timestamp of last speed change (ms)
+  float temperature_hysteresis;       ///< Temperature dead zone (default 3.0°C)
+  uint32_t min_speed_change_interval; ///< Minimum interval between speed
+                                      ///< changes (default 2000ms)
+  bool speed_changing; ///< Flag indicating gradual speed change in progress
 } fan_instance_t;
 
 typedef struct {
@@ -99,7 +111,10 @@ typedef struct {
   uint8_t num_curve_points;           // Number of curve points
   fan_curve_point_t curve_points[10]; // Temperature curve points (max 10)
   bool curve_enabled;                 // Whether curve is enabled
-  uint32_t version;                   // Configuration version for compatibility
+  float temperature_hysteresis;       // Temperature dead zone (°C)
+  uint32_t
+      min_speed_change_interval; // Minimum interval between speed changes (ms)
+  uint32_t version;              // Configuration version for compatibility
 } fan_full_config_t;
 
 /* ============================================================================
@@ -193,6 +208,15 @@ esp_err_t fan_controller_init(const fan_controller_config_t *config) {
     fan->curve_points = NULL;
     fan->num_curve_points = 0;
     fan->curve_enabled = false;
+
+    // Initialize temperature hysteresis and rate limiting
+    fan->last_stable_temperature = 25.0f;
+    fan->target_speed_percent = fan->config.default_speed;
+    fan->last_applied_speed = fan->config.default_speed;
+    fan->last_speed_change_time = 0;
+    fan->temperature_hysteresis = FAN_CONTROLLER_DEFAULT_TEMP_HYSTERESIS;
+    fan->min_speed_change_interval = FAN_CONTROLLER_MIN_SPEED_CHANGE_INTERVAL;
+    fan->speed_changing = false;
 
     // Do NOT configure PWM here - it will be done after loading saved config
   }
@@ -509,6 +533,44 @@ esp_err_t fan_controller_configure_gpio(uint8_t fan_id, int pwm_pin,
   return ret;
 }
 
+esp_err_t
+fan_controller_configure_hysteresis(uint8_t fan_id,
+                                    float temperature_hysteresis,
+                                    uint32_t min_speed_change_interval) {
+  if (!s_fan_ctx.initialized) {
+    return ESP_ERR_INVALID_STATE;
+  }
+
+  if (fan_id >= s_fan_ctx.num_fans) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  if (temperature_hysteresis < 0.0f || temperature_hysteresis > 20.0f) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  if (min_speed_change_interval < 100 || min_speed_change_interval > 60000) {
+    return ESP_ERR_INVALID_ARG;
+  }
+
+  if (xSemaphoreTake(s_fan_ctx.mutex, pdMS_TO_TICKS(1000)) != pdTRUE) {
+    return ESP_ERR_TIMEOUT;
+  }
+
+  fan_instance_t *fan = &s_fan_ctx.fans[fan_id];
+  fan->temperature_hysteresis = temperature_hysteresis;
+  fan->min_speed_change_interval = min_speed_change_interval;
+
+  ESP_LOGI(TAG, "Fan %d hysteresis configured: %.1f°C, %ldms", fan_id,
+           temperature_hysteresis, (long)min_speed_change_interval);
+
+  // Save configuration to NVS
+  save_fan_config(fan_id);
+
+  xSemaphoreGive(s_fan_ctx.mutex);
+  return ESP_OK;
+}
+
 esp_err_t fan_controller_set_curve(uint8_t fan_id,
                                    const fan_curve_point_t *curve_points,
                                    uint8_t num_points) {
@@ -746,10 +808,49 @@ static esp_err_t fan_controller_apply_curve(uint8_t fan_id, float temperature) {
     return ESP_ERR_INVALID_STATE;
   }
 
-  uint8_t speed = fan_controller_interpolate_speed(
+  // Get current time for rate limiting
+  uint32_t current_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
+
+  // Calculate target speed based on current temperature
+  uint8_t target_speed = fan_controller_interpolate_speed(
       fan->curve_points, fan->num_curve_points, temperature);
 
-  return fan_controller_update_pwm(fan_id, speed);
+  // Apply temperature hysteresis control
+  float temp_diff = fabsf(temperature - fan->last_stable_temperature);
+  bool significant_temp_change = temp_diff >= fan->temperature_hysteresis;
+
+  // Check if enough time has passed since last speed change
+  bool enough_time_passed = (current_time - fan->last_speed_change_time) >=
+                            fan->min_speed_change_interval;
+
+  // Update target speed
+  fan->target_speed_percent = target_speed;
+
+  // Decide whether to change speed
+  bool should_change_speed = false;
+  uint8_t new_speed = fan->last_applied_speed;
+
+  if (significant_temp_change && enough_time_passed) {
+    // Temperature changed significantly and enough time has passed
+    should_change_speed = true;
+    new_speed = target_speed;
+    fan->last_stable_temperature = temperature;
+    fan->last_speed_change_time = current_time;
+  } else if (!significant_temp_change) {
+    // Temperature is stable, keep current speed
+    new_speed = fan->last_applied_speed;
+  } else {
+    // Temperature changed but not enough time passed, keep current speed
+    new_speed = fan->last_applied_speed;
+  }
+
+  // Apply the speed if it changed
+  if (should_change_speed || new_speed != fan->last_applied_speed) {
+    fan->last_applied_speed = new_speed;
+    return fan_controller_update_pwm(fan_id, new_speed);
+  }
+
+  return ESP_OK;
 }
 
 static uint8_t fan_controller_interpolate_speed(const fan_curve_point_t *curve,
@@ -828,6 +929,52 @@ static esp_err_t cmd_fan_status(int argc, char **argv) {
                status.fault ? " [FAULT]" : "");
       }
     }
+    return ESP_OK;
+  } else if (argc == 2) {
+    // Show detailed status for specific fan
+    uint8_t fan_id = (uint8_t)atoi(argv[1]);
+    if (fan_id >= s_fan_ctx.num_fans) {
+      printf("Invalid fan ID: %d (valid range: 0-%d)\n", fan_id,
+             s_fan_ctx.num_fans - 1);
+      return ESP_ERR_INVALID_ARG;
+    }
+
+    fan_instance_t *fan = &s_fan_ctx.fans[fan_id];
+    const char *mode_str =
+        (fan->status.mode == FAN_MODE_MANUAL)       ? "Manual"
+        : (fan->status.mode == FAN_MODE_AUTO_TEMP)  ? "Auto-Temp"
+        : (fan->status.mode == FAN_MODE_AUTO_CURVE) ? "Auto-Curve"
+                                                    : "Off";
+
+    printf("Fan %d Detailed Status:\n", fan_id);
+    printf("======================\n");
+    printf("  Hardware Configuration:\n");
+    printf("    PWM Pin: GPIO%d\n", fan->config.pwm_pin);
+    printf("    PWM Channel: %d\n", fan->config.pwm_channel);
+    printf("    PWM Inverted: %s\n", fan->config.invert_pwm ? "Yes" : "No");
+    printf("  Status:\n");
+    printf("    Mode: %s\n", mode_str);
+    printf("    Speed: %d%%\n", fan->status.speed_percent);
+    printf("    Enabled: %s\n", fan->status.enabled ? "Yes" : "No");
+    printf("    Temperature: %.1f°C\n", fan->status.temperature);
+    printf("    Fault: %s\n", fan->status.fault ? "Yes" : "No");
+    printf("  Temperature Curve:\n");
+    if (fan->curve_enabled && fan->num_curve_points > 0) {
+      printf("    Enabled: Yes (%d points)\n", fan->num_curve_points);
+      for (uint8_t j = 0; j < fan->num_curve_points; j++) {
+        printf("    %.1f°C -> %d%%\n", fan->curve_points[j].temperature,
+               fan->curve_points[j].speed_percent);
+      }
+    } else {
+      printf("    Enabled: No\n");
+    }
+    printf("  Temperature Control:\n");
+    printf("    Hysteresis: %.1f°C\n", fan->temperature_hysteresis);
+    printf("    Min Change Interval: %ldms\n",
+           (long)fan->min_speed_change_interval);
+    printf("    Target Speed: %d%%\n", fan->target_speed_percent);
+    printf("    Last Applied Speed: %d%%\n", fan->last_applied_speed);
+
     return ESP_OK;
   }
 
@@ -1009,6 +1156,8 @@ static esp_err_t cmd_fan_config(int argc, char **argv) {
     printf("  show [fan_id]  - Show current fan configuration(s)\n");
     printf("  curve <fan_id> <temp1:speed1> [temp2:speed2] ... - Set "
            "temperature curve\n");
+    printf("  hysteresis <fan_id> <temp_hysteresis> <interval_ms> - Configure "
+           "temperature control\n");
     printf("Examples:\n");
     printf("  fan config save     # Save all fan configurations with runtime "
            "state\n");
@@ -1150,6 +1299,12 @@ static esp_err_t cmd_fan_config(int argc, char **argv) {
       } else {
         printf("    Enabled: No\n");
       }
+      printf("  Temperature Control:\n");
+      printf("    Hysteresis: %.1f°C\n", fan->temperature_hysteresis);
+      printf("    Min Change Interval: %ldms\n",
+             (long)fan->min_speed_change_interval);
+      printf("    Target Speed: %d%%\n", fan->target_speed_percent);
+      printf("    Last Applied Speed: %d%%\n", fan->last_applied_speed);
     } else {
       // Show all fans with summary information
       for (uint8_t i = 0; i < s_fan_ctx.num_fans; i++) {
@@ -1258,9 +1413,43 @@ static esp_err_t cmd_fan_config(int argc, char **argv) {
 
     return ret;
 
+  } else if (strcmp(action, "hysteresis") == 0) {
+    if (argc < 5) {
+      printf("Usage: fan config hysteresis <fan_id> <temp_hysteresis> "
+             "<interval_ms>\n");
+      printf("Example: fan config hysteresis 0 3.0 2000\n");
+      printf("  Sets 3°C temperature dead zone and 2000ms minimum change "
+             "interval\n");
+      return ESP_ERR_INVALID_ARG;
+    }
+
+    uint8_t fan_id = (uint8_t)atoi(argv[2]);
+    float temp_hysteresis = atof(argv[3]);
+    uint32_t interval_ms = (uint32_t)atoi(argv[4]);
+
+    if (fan_id >= s_fan_ctx.num_fans) {
+      printf("Invalid fan ID: %d (valid range: 0-%d)\n", fan_id,
+             s_fan_ctx.num_fans - 1);
+      return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t ret = fan_controller_configure_hysteresis(fan_id, temp_hysteresis,
+                                                        interval_ms);
+
+    if (ret == ESP_OK) {
+      printf("Fan %d hysteresis configured:\n", fan_id);
+      printf("  Temperature dead zone: %.1f°C\n", temp_hysteresis);
+      printf("  Minimum change interval: %ldms\n", (long)interval_ms);
+    } else {
+      printf("Failed to configure fan %d hysteresis: %s\n", fan_id,
+             esp_err_to_name(ret));
+    }
+
+    return ret;
+
   } else {
     printf("Unknown config action: %s\n", action);
-    printf("Valid actions: save, load, show, curve\n");
+    printf("Valid actions: save, load, show, curve, hysteresis\n");
     return ESP_ERR_INVALID_ARG;
   }
 }
@@ -1332,6 +1521,14 @@ static esp_err_t cmd_fan_help(void) {
   printf(
       "                      Points are automatically sorted by temperature\n");
   printf("\n");
+  printf("    hysteresis <fan_id> <temp_hysteresis> <interval_ms>\n");
+  printf("                    - Configure temperature control behavior\n");
+  printf("                      temp_hysteresis: Temperature dead zone "
+         "(0.0-20.0°C)\n");
+  printf("                      interval_ms: Minimum change interval "
+         "(100-60000ms)\n");
+  printf("                      Reduces fan noise and extends lifespan\n");
+  printf("\n");
   printf("  help\n");
   printf("    Display this help information\n");
   printf("\n");
@@ -1354,6 +1551,9 @@ static esp_err_t cmd_fan_help(void) {
   printf("\n");
   printf("  # Configure temperature curve for fan 0\n");
   printf("  fan config curve 0 30:20 50:30 70:40 80:100\n");
+  printf("\n");
+  printf("  # Configure temperature hysteresis for fan 0\n");
+  printf("  fan config hysteresis 0 3.0 2000  # 3°C dead zone, 2s interval\n");
   printf("\n");
   printf("  # Save all fan configurations\n");
   printf("  fan config save\n");
@@ -1424,7 +1624,11 @@ static esp_err_t save_fan_full_config(uint8_t fan_id) {
       .enabled = s_fan_ctx.fans[fan_id].status.enabled,
       .num_curve_points = s_fan_ctx.fans[fan_id].num_curve_points,
       .curve_enabled = s_fan_ctx.fans[fan_id].curve_enabled,
-      .version = 2 // Configuration version for future compatibility
+      .temperature_hysteresis = s_fan_ctx.fans[fan_id].temperature_hysteresis,
+      .min_speed_change_interval =
+          s_fan_ctx.fans[fan_id].min_speed_change_interval,
+      .version = 3 // Configuration version for future compatibility (updated
+                   // for hysteresis)
   };
 
   // Copy curve points if they exist
@@ -1558,7 +1762,7 @@ static esp_err_t load_fan_full_config(uint8_t fan_id) {
 
   if (ret == ESP_OK) {
     // Check version compatibility
-    if (full_config.version < 1 || full_config.version > 2) {
+    if (full_config.version < 1 || full_config.version > 3) {
       ESP_LOGW(TAG,
                "Fan %d config version mismatch, using hardware config only",
                fan_id);
@@ -1601,13 +1805,29 @@ static esp_err_t load_fan_full_config(uint8_t fan_id) {
       }
     }
 
+    // Load hysteresis configuration if version 3 or higher
+    if (full_config.version >= 3) {
+      s_fan_ctx.fans[fan_id].temperature_hysteresis =
+          full_config.temperature_hysteresis;
+      s_fan_ctx.fans[fan_id].min_speed_change_interval =
+          full_config.min_speed_change_interval;
+    } else {
+      // Use defaults for older versions
+      s_fan_ctx.fans[fan_id].temperature_hysteresis =
+          FAN_CONTROLLER_DEFAULT_TEMP_HYSTERESIS;
+      s_fan_ctx.fans[fan_id].min_speed_change_interval =
+          FAN_CONTROLLER_MIN_SPEED_CHANGE_INTERVAL;
+    }
+
     ESP_LOGI(
         TAG,
         "Fan %d full configuration loaded: GPIO%d, Mode:%d, Speed:%d%%, "
-        "Enabled:%s, Curve:%s (%d points)",
+        "Enabled:%s, Curve:%s (%d points), Hysteresis:%.1f°C, Interval:%ldms",
         fan_id, full_config.hardware_config.pwm_pin, full_config.current_mode,
         full_config.current_speed, full_config.enabled ? "Yes" : "No",
-        full_config.curve_enabled ? "Yes" : "No", full_config.num_curve_points);
+        full_config.curve_enabled ? "Yes" : "No", full_config.num_curve_points,
+        s_fan_ctx.fans[fan_id].temperature_hysteresis,
+        (long)s_fan_ctx.fans[fan_id].min_speed_change_interval);
 
     // Re-configure PWM with loaded settings
     if (s_fan_ctx.fans[fan_id].config.pwm_pin >= 0) {

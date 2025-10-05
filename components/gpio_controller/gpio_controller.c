@@ -190,25 +190,47 @@ esp_err_t gpio_controller_read_input(uint8_t pin, gpio_state_t *state) {
   }
 
   esp_err_t ret = ESP_OK;
+  gpio_pin_config_t *config = &s_gpio_state.pin_configs[pin];
 
-  // Configure pin as input
-  ret = configure_gpio_pin(pin, GPIO_MODE_INPUT);
-  if (ret != ESP_OK) {
-    ESP_LOGE(TAG, "Failed to configure GPIO%d as input: %s", pin,
-             esp_err_to_name(ret));
-    goto cleanup;
+  // Check if pin is already configured as output - if so, avoid reconfiguring
+  // to prevent state changes during read operations (critical for recovery
+  // mode)
+  if (config->configured && config->mode == GPIO_CTRL_MODE_OUTPUT) {
+    ESP_LOGW(TAG,
+             "GPIO%d is configured as output, reading current level without "
+             "reconfiguring",
+             pin);
+
+    // Read GPIO level directly without changing configuration
+    int level = gpio_get_level(pin);
+    *state = (level == 1) ? GPIO_STATE_HIGH : GPIO_STATE_LOW;
+
+    // Don't update internal configuration for output pins during read
+    ESP_LOGD(TAG, "GPIO%d (output mode) read as %s", pin,
+             *state == GPIO_STATE_HIGH ? "HIGH" : "LOW");
+  } else {
+    // Configure pin as input for actual input pins
+    ret = configure_gpio_pin(pin, GPIO_MODE_INPUT);
+    if (ret != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to configure GPIO%d as input: %s", pin,
+               esp_err_to_name(ret));
+      goto cleanup;
+    }
+
+    // Read GPIO level
+    int level = gpio_get_level(pin);
+    *state = (level == 1) ? GPIO_STATE_HIGH : GPIO_STATE_LOW;
+
+    // Update internal configuration for input pins
+    ret = update_pin_config(pin, GPIO_CTRL_MODE_INPUT, *state);
+    if (ret == ESP_OK) {
+      ESP_LOGD(TAG, "GPIO%d (input mode) read as %s", pin,
+               *state == GPIO_STATE_HIGH ? "HIGH" : "LOW");
+    }
   }
 
-  // Read GPIO level
-  int level = gpio_get_level(pin);
-  *state = (level == 1) ? GPIO_STATE_HIGH : GPIO_STATE_LOW;
-
-  // Update internal configuration
-  ret = update_pin_config(pin, GPIO_CTRL_MODE_INPUT, *state);
   if (ret == ESP_OK) {
     s_gpio_state.total_operations++;
-    ESP_LOGD(TAG, "GPIO%d read as %s", pin,
-             *state == GPIO_STATE_HIGH ? "HIGH" : "LOW");
   }
 
 cleanup:

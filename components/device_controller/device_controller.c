@@ -231,7 +231,8 @@ esp_err_t device_controller_agx_enter_recovery_mode(void) {
 
   ESP_LOGI(TAG, "Entering AGX recovery mode");
 
-  // Step 1: Pull recovery pin high
+  // Step 1: Pull recovery pin high and hold for 1000ms
+  ESP_LOGI(TAG, "Step 1: Setting GPIO%d (recovery pin) HIGH", AGX_RECOVERY_PIN);
   esp_err_t ret = gpio_controller_set_output(AGX_RECOVERY_PIN, GPIO_STATE_HIGH);
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set AGX recovery pin high: %s",
@@ -240,10 +241,37 @@ esp_err_t device_controller_agx_enter_recovery_mode(void) {
     return ret;
   }
 
-  // Step 2: Hold for 1 second
+  // Note: Avoid state verification to prevent GPIO interference
+  ESP_LOGI(TAG, "GPIO%d set to HIGH, holding for 1000ms...", AGX_RECOVERY_PIN);
+  vTaskDelay(pdMS_TO_TICKS(1000));
+
+  // Step 2: Execute AGX reset directly (avoid mutex deadlock)
+  ESP_LOGI(TAG, "Step 2: Executing AGX reset");
+
+  // Pull reset pin high
+  ret = gpio_controller_set_output(AGX_RESET_PIN, GPIO_STATE_HIGH);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to set AGX reset pin high: %s", esp_err_to_name(ret));
+    xSemaphoreGive(s_device_mutex);
+    return ret;
+  }
+
+  // Hold for reset pulse duration
+  vTaskDelay(pdMS_TO_TICKS(AGX_RESET_PULSE_MS));
+
+  // Pull reset pin low
+  ret = gpio_controller_set_output(AGX_RESET_PIN, GPIO_STATE_LOW);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to set AGX reset pin low: %s", esp_err_to_name(ret));
+    xSemaphoreGive(s_device_mutex);
+    return ret;
+  }
+
+  ESP_LOGI(TAG, "AGX reset completed, waiting 1000ms");
   vTaskDelay(pdMS_TO_TICKS(1000));
 
   // Step 3: Pull recovery pin low
+  ESP_LOGI(TAG, "Step 3: Setting GPIO%d (recovery pin) LOW", AGX_RECOVERY_PIN);
   ret = gpio_controller_set_output(AGX_RECOVERY_PIN, GPIO_STATE_LOW);
   if (ret != ESP_OK) {
     ESP_LOGE(TAG, "Failed to set AGX recovery pin low: %s",
@@ -251,6 +279,9 @@ esp_err_t device_controller_agx_enter_recovery_mode(void) {
     xSemaphoreGive(s_device_mutex);
     return ret;
   }
+
+  // Note: Avoid state verification to prevent GPIO interference
+  ESP_LOGI(TAG, "GPIO%d set to LOW", AGX_RECOVERY_PIN);
 
   xSemaphoreGive(s_device_mutex);
 
@@ -264,12 +295,27 @@ esp_err_t device_controller_agx_enter_recovery_mode(void) {
     }
   }
 
-  if (xSemaphoreTake(s_device_mutex, pdMS_TO_TICKS(1000)) == pdTRUE) {
-    s_device_status.agx_operations_count++;
-    xSemaphoreGive(s_device_mutex);
+  // Update operation counts (we already have the mutex)
+  s_device_status.agx_operations_count += 2; // One for recovery, one for reset
+
+  // Verification: Log completion without reading pin state to avoid
+  // interference
+  ESP_LOGI(TAG, "AGX recovery mode sequence completed");
+  ESP_LOGI(
+      TAG,
+      "Recovery sequence executed: HIGH(1000ms) -> AGX_RESET -> LOW(stable)");
+
+  // Additional non-intrusive verification
+  if (usb_mux_controller_is_initialized()) {
+    ESP_LOGI(TAG, "USB MUX switched to AGX for recovery access");
+  } else {
+    ESP_LOGW(
+        TAG,
+        "USB MUX controller not available - manual connection may be required");
   }
 
-  ESP_LOGI(TAG, "AGX recovery mode entry completed successfully");
+  ESP_LOGI(TAG, "AGX recovery mode entry completed successfully - device "
+                "should now be in recovery mode and accessible via USB");
   return ESP_OK;
 }
 
