@@ -200,6 +200,42 @@ esp_err_t usb_mux_controller_reset_to_default(void);
  */
 const usb_mux_config_t *usb_mux_controller_get_default_config(void);
 
+/**
+ * @brief Save current USB MUX configuration to NVS
+ *
+ * @return
+ *     - ESP_OK: Success
+ *     - ESP_ERR_INVALID_STATE: Controller not initialized
+ *     - ESP_FAIL: Save operation failed
+ */
+esp_err_t usb_mux_controller_save_config(void);
+
+/**
+ * @brief Load USB MUX configuration from NVS
+ *
+ * @return
+ *     - ESP_OK: Success
+ *     - ESP_ERR_INVALID_STATE: Controller not initialized
+ *     - ESP_ERR_NOT_FOUND: No saved configuration found
+ *     - ESP_FAIL: Load operation failed
+ */
+esp_err_t usb_mux_controller_load_config(void);
+
+/**
+ * @brief Verify current GPIO pin states match expected target
+ *
+ * This function reads the actual GPIO pin states and verifies they match
+ * the expected states for the current target. Useful for debugging hardware
+ * issues and ensuring switches are working correctly.
+ *
+ * @param target_verified Pointer to store whether target is verified (optional)
+ * @return
+ *     - ESP_OK: GPIO states match expected target
+ *     - ESP_ERR_INVALID_STATE: Controller not initialized or mismatch detected
+ *     - ESP_FAIL: GPIO read operation failed
+ */
+esp_err_t usb_mux_controller_verify_target(bool *target_verified);
+
 #ifdef __cplusplus
 }
 #endif

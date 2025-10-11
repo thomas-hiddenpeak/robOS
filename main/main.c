@@ -306,7 +306,19 @@ static esp_err_t system_init(void) {
   }
   ESP_LOGI(TAG, "Configuration management commands registered");
 
-  // 4.1. Load device configuration and handle LPMU auto-start
+  // 4.1. Load USB MUX configuration now that config manager is ready
+  ret = usb_mux_controller_load_config();
+  if (ret == ESP_ERR_NOT_FOUND) {
+    ESP_LOGI(TAG, "No saved USB MUX configuration found, using default");
+  } else if (ret != ESP_OK) {
+    ESP_LOGW(TAG, "Failed to load USB MUX configuration: %s",
+             esp_err_to_name(ret));
+    // This is not critical for system operation, continue with warning
+  } else {
+    ESP_LOGI(TAG, "USB MUX configuration loaded successfully");
+  }
+
+  // 4.2. Load device configuration and handle LPMU auto-start
   ret = device_controller_post_config_init();
   if (ret != ESP_OK) {
     ESP_LOGW(TAG, "Failed to load device configuration or auto-start LPMU: %s",
@@ -331,7 +343,7 @@ static esp_err_t system_init(void) {
   }
   ESP_LOGI(TAG, "Fan commands registered");
 
-  // 6. Touch LED Controller (visual feedback and interaction)
+  // 6. Touch LED Controller (visual feedback and interaction) - 优化RMT配置
   touch_led_config_t touch_led_config = {
       .led_gpio = GPIO_NUM_45,   // WS2812 data line
       .touch_gpio = GPIO_NUM_NC, // Touch sensor pin (not configured yet)
@@ -348,6 +360,9 @@ static esp_err_t system_init(void) {
     ESP_LOGW(TAG, "Continuing without touch LED functionality");
   } else {
     ESP_LOGI(TAG, "Touch LED controller initialized");
+
+    // 小延迟以避免RMT资源冲突
+    vTaskDelay(pdMS_TO_TICKS(50));
 
     // Register touch event callback
     ret = touch_led_register_callback(touch_event_handler);
@@ -381,7 +396,7 @@ static esp_err_t system_init(void) {
   }
   ESP_LOGI(TAG, "System commands registered");
 
-  // Initialize Board LED System
+  // Initialize Board LED System - 优化RMT配置
   ESP_LOGI(TAG, "Initializing board LED system...");
   ret = board_led_init();
   if (ret != ESP_OK) {
@@ -391,9 +406,14 @@ static esp_err_t system_init(void) {
   } else {
     ESP_LOGI(TAG, "Board LED controller initialized (GPIO %d, %d LEDs)",
              BOARD_LED_GPIO_PIN, BOARD_LED_COUNT);
+
+    // 小延迟以避免RMT资源冲突
+    vTaskDelay(pdMS_TO_TICKS(50));
   }
 
-  // 7. Ethernet Manager (W5500 network controller)
+  // 7. Matrix LED Controller (32x32 WS2812 Matrix) - 在存储就绪后初始化
+
+  // 8. Ethernet Manager (W5500 network controller)
   ESP_LOGI(TAG, "Initializing ethernet manager...");
   ret = ethernet_manager_init(NULL); // Use default configuration
   if (ret != ESP_OK) {

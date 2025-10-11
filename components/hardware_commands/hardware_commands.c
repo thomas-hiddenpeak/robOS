@@ -17,7 +17,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ============================================================================
+/* ============================================  } else if (strcmp(argv[1],
+ "recovery") == 0) { printf("正在启动 AGX 恢复模式...\n"); ret =
+ device_controller_agx_enter_recovery_mode(); if (ret == ESP_OK) { printf("AGX
+ 设备强制恢复模式完成\n"); printf("恢复序列已执行: HIGH(1秒) -> AGX重启 ->
+ LOW(稳定)\n"); printf("USB MUX 已切换到 AGX，设备应该可以通过 USB 访问\n");
+      printf("请检查主机端是否检测到处于恢复模式的 AGX 设备\n");
+    } else {
+      printf("错误: AGX 设备强制恢复模式失败: %s\n", esp_err_to_name(ret));
+    }=====================
  * Private Constants and Macros
  * ============================================================================
  */
@@ -260,8 +268,42 @@ esp_err_t hardware_cmd_usbmux(int argc, char **argv) {
     } else {
       printf("错误: 获取USB MUX状态失败: %s\r\n", esp_err_to_name(ret));
     }
+  } else if (strcmp(argv[1], "verify") == 0) {
+    bool verified;
+    ret = usb_mux_controller_verify_target(&verified);
+    if (ret == ESP_OK) {
+      if (verified) {
+        printf("✓ GPIO引脚状态验证通过\r\n");
+      } else {
+        printf("✗ GPIO引脚状态验证失败\r\n");
+      }
+    } else {
+      printf("错误: 验证操作失败: %s\r\n", esp_err_to_name(ret));
+    }
+  } else if (strcmp(argv[1], "save") == 0) {
+    ret = usb_mux_controller_save_config();
+    if (ret == ESP_OK) {
+      printf("✓ USB MUX配置已保存到NVS存储\r\n");
+    } else {
+      printf("✗ 保存配置失败: %s\r\n", esp_err_to_name(ret));
+    }
+  } else if (strcmp(argv[1], "load") == 0) {
+    ret = usb_mux_controller_load_config();
+    if (ret == ESP_OK) {
+      usb_mux_target_t current_target;
+      if (usb_mux_controller_get_target(&current_target) == ESP_OK) {
+        printf("✓ USB MUX配置已从NVS存储加载: %s\r\n",
+               usb_mux_controller_get_target_name(current_target));
+      } else {
+        printf("✓ USB MUX配置已从NVS存储加载\r\n");
+      }
+    } else if (ret == ESP_ERR_NOT_FOUND) {
+      printf("! 未找到保存的配置\r\n");
+    } else {
+      printf("✗ 加载配置失败: %s\r\n", esp_err_to_name(ret));
+    }
   } else {
-    printf("错误: 无效的目标: %s\r\n", argv[1]);
+    printf("错误: 无效的命令: %s\r\n", argv[1]);
     print_usbmux_usage();
     ret = ESP_ERR_INVALID_ARG;
   }
@@ -361,11 +403,17 @@ static void print_gpio_usage(void) {
 }
 
 static void print_usbmux_usage(void) {
-  printf("用法: usbmux esp32s3|agx|lpmu|status\r\n");
+  printf("用法: usbmux <command> [args...]\r\n");
+  printf("切换命令:\r\n");
   printf("  esp32s3 - 切换USB-C接口到ESP32S3\r\n");
   printf("  agx     - 切换USB-C接口到AGX\r\n");
   printf("  lpmu    - 切换USB-C接口到LPMU\r\n");
+  printf("状态命令:\r\n");
   printf("  status  - 显示当前USB-C接口连接状态\r\n");
+  printf("  verify  - 验证GPIO引脚状态是否与当前目标匹配\r\n");
+  printf("配置命令:\r\n");
+  printf("  save    - 保存当前配置到NVS存储\r\n");
+  printf("  load    - 从NVS存储加载配置\r\n");
 }
 
 esp_err_t hardware_cmd_agx(int argc, char **argv) {
@@ -409,9 +457,13 @@ esp_err_t hardware_cmd_agx(int argc, char **argv) {
       printf("错误: AGX 设备重启失败: %s\r\n", esp_err_to_name(ret));
     }
   } else if (strcmp(argv[1], "recovery") == 0) {
+    printf("正在启动 AGX 恢复模式...\r\n");
     ret = device_controller_agx_enter_recovery_mode();
     if (ret == ESP_OK) {
       printf("AGX 设备强制恢复模式完成\r\n");
+      printf("恢复信号已发送 (LOW->HIGH 2秒->LOW)\r\n");
+      printf("USB MUX 已切换到 AGX，设备应该可以通过 USB 访问\r\n");
+      printf("请检查主机端是否检测到 AGX 设备\r\n");
     } else {
       printf("错误: AGX 设备强制恢复模式失败: %s\r\n", esp_err_to_name(ret));
     }
