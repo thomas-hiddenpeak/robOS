@@ -30,18 +30,63 @@
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
+            padding-top: 160px; /* 减少基础间距，因为main-panel的上边距已经增加 */
+        }
+
+        .fixed-header {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            padding: 30px;
+            max-width: 1160px; /* 与container内容宽度一致：1200px - 40px (左右padding) */
+            width: calc(100% - 40px); /* 与container保持相同的边距 */
+        }
+
+        .fixed-header-content {
+            margin: 0;
+            padding: 0;
         }
 
         .header {
             text-align: center;
             color: white;
-            margin-bottom: 30px;
+            margin-bottom: 20px;
+            transition: color 0.3s ease;
         }
 
         .header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 10px;
+            font-size: 2.2rem;
+            margin-bottom: 8px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            transition: color 0.3s ease, text-shadow 0.3s ease;
+        }
+
+        .dashboard-title-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .dashboard-logo {
+            height: 1.1rem; /* 缩小到原来的50%：2.2rem * 0.5 = 1.1rem */
+            width: auto;
+            object-fit: contain;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
+        }
+
+        .header p {
+            font-size: 1rem;
+            opacity: 0.9;
+            margin: 0;
+            transition: color 0.3s ease;
         }
 
         .connection-status {
@@ -49,9 +94,21 @@
             backdrop-filter: blur(10px);
             border-radius: 10px;
             padding: 15px;
-            margin-bottom: 20px;
             color: white;
             text-align: center;
+            margin: 0 auto;
+            max-width: 100%; /* 与system-header保持相同宽度 */
+            transition: color 0.3s ease;
+        }
+
+        .main-panel {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(15px);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 120px 0 20px 0; /* 调整上边距到120px */
+            border: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
         }
 
         .status-indicator {
@@ -97,7 +154,7 @@
         .card-title {
             font-size: 1.2rem;
             font-weight: 600;
-            color: #2c3e50;
+            color: #323232;
         }
 
         .metric {
@@ -115,7 +172,7 @@
 
         .metric-value {
             font-weight: 600;
-            color: #2c3e50;
+            color: #323232;
         }
 
         .progress-bar {
@@ -162,7 +219,7 @@
 
         .cpu-core-usage {
             font-weight: bold;
-            color: #2c3e50;
+            color: #323232;
         }
 
         .cpu-core-freq {
@@ -209,7 +266,7 @@
         .disk-usage {
             font-size: 1.1rem;
             font-weight: bold;
-            color: #2c3e50;
+            color: #323232;
             margin-bottom: 4px;
         }
 
@@ -235,7 +292,7 @@
         .temp-value {
             font-size: 1.1rem;
             font-weight: bold;
-            color: #2c3e50;
+            color: #323232;
         }
 
         .no-data {
@@ -309,10 +366,34 @@
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
+                padding-top: 180px; /* 移动端相应调整 */
+            }
+            
+            .fixed-header {
+                top: 10px;
+                max-width: calc(100% - 20px); /* 与移动端container保持一致 */
+                width: calc(100% - 20px);
+                padding: 20px;
+            }
+            
+            .fixed-header-content {
+                padding: 0;
             }
             
             .header h1 {
                 font-size: 1.8rem;
+            }
+            
+            .dashboard-title-container {
+                margin-bottom: 8px; /* 移动端减少间距 */
+            }
+            
+            .dashboard-logo {
+                height: 0.9rem; /* 缩小到原来的50%：1.8rem * 0.5 = 0.9rem */
+            }
+            
+            .header p {
+                font-size: 0.9rem;
             }
             
             .dashboard {
@@ -344,118 +425,128 @@
     </style>
 </head>
 <body>
+    <!-- 固定头部 -->
+    <div class="fixed-header">
+        <div class="fixed-header-content">
+            <div class="header">
+                <div class="dashboard-title-container">
+                    <img src="base.png" alt="Logo" class="dashboard-logo" />
+                </div>
+                <h1>RM - 01 Dashboard</h1>
+                <p>RobOS ( Rack on board ) 实时系统性能监控面板</p>
+            </div>
+
+            <div class="connection-status">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <span class="status-indicator status-connecting" id="agxStatusIndicator"></span>
+                        <span id="agxStatusText">正在连接到 推理服务器...</span>
+                    </div>
+                    <div>
+                        <span class="status-indicator status-connecting" id="lpmuStatusIndicator"></span>
+                        <span id="lpmuStatusText">正在连接到 应用服务器...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
-        <div class="header">
-            <h1>RM - 01 Dashboard</h1>
-            <p>RobOS ( Rack on board ) 实时系统性能监控面板</p>
-        </div>
+        <div class="main-panel">
 
-        <div class="connection-status">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <div>
-                    <span class="status-indicator status-connecting" id="agxStatusIndicator"></span>
-                    <span id="agxStatusText">正在连接到 推理服务器...</span>
+            <!-- 推理服务器 监控部分 -->
+            <div class="system-section">
+                <div class="system-header">
+                    <h2>🖥️ 推理模组监控</h2>
+                    <p>NVIDIA 推理服务器系统状态</p>
                 </div>
-                <div>
-                    <span class="status-indicator status-connecting" id="lpmuStatusIndicator"></span>
-                    <span id="lpmuStatusText">正在连接到 应用服务器...</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- 推理服务器 监控部分 -->
-        <div class="system-section">
-            <div class="system-header">
-                <h2>🖥️ 推理模组监控</h2>
-                <p>NVIDIA 推理服务器系统状态</p>
-            </div>
-            
-            <div class="dashboard">
-                <!-- 推理服务器 CPU 监控卡片 -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-icon"> </div>
-                        <div class="card-title">CPU 监控</div>
-                    </div>
-                    <div id="cpuContent">
-                        <div class="no-data">等待数据...</div>
-                    </div>
-                </div>
-
-                <!-- 推理服务器 内存监控卡片 -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-icon"> </div>
-                        <div class="card-title">显存监控</div>
-                    </div>
-                    <div id="memoryContent">
-                        <div class="no-data">等待数据...</div>
-                    </div>
-                </div>
-
-                <!-- 推理服务器 温度监控卡片 -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-icon"> </div>
-                        <div class="card-title">温度监控</div>
-                    </div>
-                    <div id="temperatureContent">
-                        <div class="no-data">等待数据...</div>
-                    </div>
-                </div>
-
-                <!-- 推理服务器 功耗监控卡片 -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-icon"> </div>
-                        <div class="card-title">功耗监控</div>
-                    </div>
-                    <div id="powerContent">
-                        <div class="no-data">等待数据...</div>
-                    </div>
-                </div>
-
-                <!-- 推理服务器 GPU 监控卡片 -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-icon"> </div>
-                        <div class="card-title">GPU 监控</div>
-                    </div>
-                    <div id="gpuContent">
-                        <div class="no-data">等待数据...</div>
-                    </div>
-                </div>
-
-                <!-- 推理服务器 系统信息卡片 -->
-                <div class="card">
-                    <div class="card-header">
-                        <div class="card-icon"> </div>
-                        <div class="card-title">系统信息</div>
-                    </div>
-                    <div id="systemContent">
-                        <div class="metric">
-                            <span class="metric-label">最后更新</span>
-                            <span class="metric-value" id="lastUpdate">-</span>
+                
+                <div class="dashboard">
+                    <!-- 推理服务器 CPU 监控卡片 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon"> </div>
+                            <div class="card-title">CPU 监控</div>
                         </div>
-                        <div class="metric">
-                            <span class="metric-label">连接时间</span>
-                            <span class="metric-value" id="connectionTime">-</span>
+                        <div id="cpuContent">
+                            <div class="no-data">等待数据...</div>
                         </div>
-                        <div class="metric">
-                            <span class="metric-label">数据包</span>
-                            <span class="metric-value" id="dataPackets">0</span>
+                    </div>
+
+                    <!-- 推理服务器 内存监控卡片 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon"> </div>
+                            <div class="card-title">显存监控</div>
+                        </div>
+                        <div id="memoryContent">
+                            <div class="no-data">等待数据...</div>
+                        </div>
+                    </div>
+
+                    <!-- 推理服务器 温度监控卡片 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon"> </div>
+                            <div class="card-title">温度监控</div>
+                        </div>
+                        <div id="temperatureContent">
+                            <div class="no-data">等待数据...</div>
+                        </div>
+                    </div>
+
+                    <!-- 推理服务器 功耗监控卡片 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon"> </div>
+                            <div class="card-title">功耗监控</div>
+                        </div>
+                        <div id="powerContent">
+                            <div class="no-data">等待数据...</div>
+                        </div>
+                    </div>
+
+                    <!-- 推理服务器 GPU 监控卡片 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon"> </div>
+                            <div class="card-title">GPU 监控</div>
+                        </div>
+                        <div id="gpuContent">
+                            <div class="no-data">等待数据...</div>
+                        </div>
+                    </div>
+
+                    <!-- 推理服务器 系统信息卡片 -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-icon"> </div>
+                            <div class="card-title">系统信息</div>
+                        </div>
+                        <div id="systemContent">
+                            <div class="metric">
+                                <span class="metric-label">最后更新</span>
+                                <span class="metric-value" id="lastUpdate">-</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">连接时间</span>
+                                <span class="metric-value" id="connectionTime">-</span>
+                            </div>
+                            <div class="metric">
+                                <span class="metric-label">数据包</span>
+                                <span class="metric-value" id="dataPackets">0</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- LattePanda Mu 监控部分 -->
-        <div class="system-section">
-            <div class="system-header">
-                <h2>🖥️ 应用模组监控</h2>
-                <p>Intel X86 应用服务器系统状态</p>
-            </div>
+            <!-- LattePanda Mu 监控部分 -->
+            <div class="system-section">
+                <div class="system-header">
+                    <h2>🖥️ 应用模组监控</h2>
+                    <p>Intel X86 应用服务器系统状态</p>
+                </div>
             
             <div class="lpmu-dashboard">
                 <!-- 第一行：CPU、内存、系统信息 -->
@@ -533,6 +624,7 @@
                     </div>
                 </div>
             </div>
+        </div>
         </div>
     </div>
 
@@ -1094,7 +1186,63 @@
         document.addEventListener('DOMContentLoaded', () => {
             new 推理服务器Monitor();
             new 应用服务器Monitor();
+            
+            // 添加滚动监听器来实现文字颜色渐变
+            initScrollColorTransition();
         });
+
+        // 滚动颜色渐变功能
+        function initScrollColorTransition() {
+            const header = document.querySelector('.header');
+            const headerH1 = document.querySelector('.header h1');
+            const headerP = document.querySelector('.header p');
+            const connectionStatus = document.querySelector('.connection-status');
+            const connectionTexts = document.querySelectorAll('.connection-status span:not(.status-indicator)');
+            
+            // 计算10%滚动距离
+            const maxScroll = window.innerHeight * 0.1;
+            
+            function updateTextColors() {
+                const scrollY = window.scrollY;
+                
+                // 计算渐变进度 (0-1)
+                const progress = Math.min(scrollY / maxScroll, 1);
+                
+                // 从白色(255,255,255)渐变到#323232(50,50,50)
+                const startColor = { r: 255, g: 255, b: 255 };
+                const endColor = { r: 50, g: 50, b: 50 };
+                
+                const currentColor = {
+                    r: Math.round(startColor.r + (endColor.r - startColor.r) * progress),
+                    g: Math.round(startColor.g + (endColor.g - startColor.g) * progress),
+                    b: Math.round(startColor.b + (endColor.b - startColor.b) * progress)
+                };
+                
+                const colorValue = `rgb(${currentColor.r}, ${currentColor.g}, ${currentColor.b})`;
+                
+                // 应用颜色到各个元素
+                if (header) header.style.color = colorValue;
+                if (headerH1) {
+                    headerH1.style.color = colorValue;
+                    // 调整文字阴影透明度
+                    const shadowOpacity = 0.3 * (1 - progress);
+                    headerH1.style.textShadow = `2px 2px 4px rgba(0,0,0,${shadowOpacity})`;
+                }
+                if (headerP) headerP.style.color = colorValue;
+                if (connectionStatus) connectionStatus.style.color = colorValue;
+                
+                // 更新连接状态文字颜色
+                connectionTexts.forEach(text => {
+                    if (text) text.style.color = colorValue;
+                });
+            }
+            
+            // 监听滚动事件
+            window.addEventListener('scroll', updateTextColors);
+            
+            // 初始化颜色
+            updateTextColors();
+        }
     </script>
 </body>
 </html>
