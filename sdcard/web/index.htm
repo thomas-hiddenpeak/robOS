@@ -52,6 +52,41 @@
         .fixed-header-content {
             margin: 0;
             padding: 0;
+            position: relative;
+        }
+
+        /* 语言切换按钮样式 */
+        .language-switcher {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 8px 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85rem;
+            color: white;
+            font-weight: 500;
+        }
+
+        .language-switcher:hover {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .language-switcher .lang-icon {
+            font-size: 1rem;
+        }
+
+        .language-switcher .lang-text {
+            transition: color 0.3s ease;
         }
 
         .header {
@@ -587,23 +622,29 @@
     <!-- 固定头部 -->
     <div class="fixed-header">
         <div class="fixed-header-content">
+            <!-- 语言切换按钮 -->
+            <div class="language-switcher" id="languageSwitcher" onclick="switchLanguage()">
+                <span class="lang-icon">🌐</span>
+                <span class="lang-text" id="langText">EN</span>
+            </div>
+            
             <div class="header">
                 <div class="dashboard-title-container">
                     <img src="base.png" alt="Logo" class="dashboard-logo" />
                 </div>
-                <h1>RM - 01 Dashboard</h1>
-                <p>RobOS ( Rack on board ) 实时系统性能监控面板</p>
+                <h1 data-translate="title">RM - 01 Dashboard</h1>
+                <p data-translate="subtitle">RobOS ( Rack on board ) 实时系统性能监控面板</p>
             </div>
 
             <div class="connection-status">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                     <div>
                         <span class="status-indicator status-connecting" id="agxStatusIndicator"></span>
-                        <span id="agxStatusText">正在连接到 推理服务器...</span>
+                        <span id="agxStatusText" data-translate="connecting-inference">正在连接到 推理服务器...</span>
                     </div>
                     <div>
                         <span class="status-indicator status-connecting" id="lpmuStatusIndicator"></span>
-                        <span id="lpmuStatusText">正在连接到 应用服务器...</span>
+                        <span id="lpmuStatusText" data-translate="connecting-application">正在连接到 应用服务器...</span>
                     </div>
                 </div>
             </div>
@@ -616,8 +657,8 @@
             <!-- 推理服务器 监控部分 -->
             <div class="system-section">
                 <div class="system-header">
-                    <h2>推理模组监控</h2>
-                    <p>NVIDIA 推理服务器系统状态</p>
+                    <h2 data-translate="inference-monitoring">推理模组监控</h2>
+                    <p data-translate="nvidia-status">NVIDIA 推理服务器系统状态</p>
                 </div>
                 
                 <div class="dashboard">
@@ -625,10 +666,10 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-icon"> </div>
-                            <div class="card-title">CPU 监控</div>
+                            <div class="card-title" data-translate="cpu-monitoring">CPU 监控</div>
                         </div>
                         <div id="cpuContent">
-                            <div class="no-data">等待数据...</div>
+                            <div class="no-data" data-translate="waiting-data">等待数据...</div>
                         </div>
                     </div>
 
@@ -636,10 +677,10 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-icon"> </div>
-                            <div class="card-title">显存监控</div>
+                            <div class="card-title" data-translate="memory-monitoring">显存监控</div>
                         </div>
                         <div id="memoryContent">
-                            <div class="no-data">等待数据...</div>
+                            <div class="no-data" data-translate="waiting-data">等待数据...</div>
                         </div>
                     </div>
 
@@ -647,10 +688,10 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-icon"> </div>
-                            <div class="card-title">温度监控</div>
+                            <div class="card-title" data-translate="temperature-monitoring">温度监控</div>
                         </div>
                         <div id="temperatureContent">
-                            <div class="no-data">等待数据...</div>
+                            <div class="no-data" data-translate="waiting-data">等待数据...</div>
                         </div>
                     </div>
 
@@ -658,10 +699,10 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-icon"> </div>
-                            <div class="card-title">功耗监控</div>
+                            <div class="card-title" data-translate="power-monitoring">功耗监控</div>
                         </div>
                         <div id="powerContent">
-                            <div class="no-data">等待数据...</div>
+                            <div class="no-data" data-translate="waiting-data">等待数据...</div>
                         </div>
                     </div>
 
@@ -669,10 +710,10 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-icon"> </div>
-                            <div class="card-title">GPU 监控</div>
+                            <div class="card-title" data-translate="gpu-monitoring">GPU 监控</div>
                         </div>
                         <div id="gpuContent">
-                            <div class="no-data">等待数据...</div>
+                            <div class="no-data" data-translate="waiting-data">等待数据...</div>
                         </div>
                     </div>
 
@@ -680,20 +721,20 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-icon"> </div>
-                            <div class="card-title">系统信息</div>
+                            <div class="card-title" data-translate="system-info">系统信息</div>
                         </div>
                         <div id="systemContent">
                             <div class="cpu-chart" style="text-align: left !important;">
                                 <div class="metric" style="text-align: left !important;">
-                                    <span class="metric-label system-metric-label" style="text-align: left !important;">最后更新</span>
+                                    <span class="metric-label system-metric-label" style="text-align: left !important;" data-translate="last-update">最后更新</span>
                                     <span class="metric-value" style="text-align: left !important;" id="lastUpdate">-</span>
                                 </div>
                                 <div class="metric" style="text-align: left !important;">
-                                    <span class="metric-label system-metric-label" style="text-align: left !important;">连接时间</span>
+                                    <span class="metric-label system-metric-label" style="text-align: left !important;" data-translate="connection-time">连接时间</span>
                                     <span class="metric-value" style="text-align: left !important;" id="connectionTime">-</span>
                                 </div>
                                 <div class="metric" style="text-align: left !important;">
-                                    <span class="metric-label system-metric-label" style="text-align: left !important;">数据包</span>
+                                    <span class="metric-label system-metric-label" style="text-align: left !important;" data-translate="data-packets">数据包</span>
                                     <span class="metric-value" style="text-align: left !important;" id="dataPackets">0</span>
                                 </div>
                             </div>
@@ -705,8 +746,8 @@
             <!-- LattePanda Mu 监控部分 -->
             <div class="system-section">
                 <div class="system-header">
-                    <h2>应用模组监控</h2>
-                    <p>Intel X86 应用服务器系统状态</p>
+                    <h2 data-translate="application-monitoring">应用模组监控</h2>
+                    <p data-translate="intel-status">Intel X86 应用服务器系统状态</p>
                 </div>
             
             <div class="lpmu-dashboard">
@@ -716,10 +757,10 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-icon"> </div>
-                            <div class="card-title">CPU 监控</div>
+                            <div class="card-title" data-translate="cpu-monitoring">CPU 监控</div>
                         </div>
                         <div id="lpmuCpuContent">
-                            <div class="no-data">等待数据...</div>
+                            <div class="no-data" data-translate="waiting-data">等待数据...</div>
                         </div>
                     </div>
 
@@ -727,10 +768,10 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-icon"> </div>
-                            <div class="card-title">内存监控</div>
+                            <div class="card-title" data-translate="ram-monitoring">内存监控</div>
                         </div>
                         <div id="lpmuMemoryContent">
-                            <div class="no-data">等待数据...</div>
+                            <div class="no-data" data-translate="waiting-data">等待数据...</div>
                         </div>
                     </div>
 
@@ -738,20 +779,20 @@
                     <div class="card">
                         <div class="card-header">
                             <div class="card-icon"> </div>
-                            <div class="card-title">系统信息</div>
+                            <div class="card-title" data-translate="system-info">系统信息</div>
                         </div>
                         <div id="lpmuSystemContent">
                             <div class="cpu-chart" style="text-align: left !important;">
                                 <div class="metric" style="text-align: left !important;">
-                                    <span class="metric-label system-metric-label" style="text-align: left !important;">最后更新</span>
+                                    <span class="metric-label system-metric-label" style="text-align: left !important;" data-translate="last-update">最后更新</span>
                                     <span class="metric-value" style="text-align: left !important;" id="lpmuLastUpdate">-</span>
                                 </div>
                                 <div class="metric" style="text-align: left !important;">
-                                    <span class="metric-label system-metric-label" style="text-align: left !important;">连接时间</span>
+                                    <span class="metric-label system-metric-label" style="text-align: left !important;" data-translate="connection-time">连接时间</span>
                                     <span class="metric-value" style="text-align: left !important;" id="lpmuConnectionTime">-</span>
                                 </div>
                                 <div class="metric" style="text-align: left !important;">
-                                    <span class="metric-label system-metric-label" style="text-align: left !important;">数据包</span>
+                                    <span class="metric-label system-metric-label" style="text-align: left !important;" data-translate="data-packets">数据包</span>
                                     <span class="metric-value" style="text-align: left !important;" id="lpmuDataPackets">0</span>
                                 </div>
                             </div>
@@ -765,10 +806,10 @@
                     <div class="card lpmu-full-width">
                         <div class="card-header">
                             <div class="card-icon"> </div>
-                            <div class="card-title">温度监控</div>
+                            <div class="card-title" data-translate="temperature-monitoring">温度监控</div>
                         </div>
                         <div id="lpmuTemperatureContent">
-                            <div class="no-data">等待数据...</div>
+                            <div class="no-data" data-translate="waiting-data">等待数据...</div>
                         </div>
                     </div>
                 </div>
@@ -779,10 +820,10 @@
                     <div class="card lpmu-full-width">
                         <div class="card-header">
                             <div class="card-icon"> </div>
-                            <div class="card-title">磁盘监控</div>
+                            <div class="card-title" data-translate="disk-monitoring">磁盘监控</div>
                         </div>
                         <div id="lpmuDiskContent">
-                            <div class="no-data">等待数据...</div>
+                            <div class="no-data" data-translate="waiting-data">等待数据...</div>
                         </div>
                     </div>
                 </div>
@@ -820,7 +861,8 @@
                 if (this.isConnecting) return;
                 
                 this.isConnecting = true;
-                this.updateConnectionStatus('connecting', '正在连接到 推理服务器...');
+                const connectingText = getTranslation('connecting-inference', '正在连接到 推理服务器...');
+                this.updateConnectionStatus('connecting', connectingText);
 
                 try {
                     // 连接到 推理服务器 服务器的 WebSocket
@@ -831,7 +873,8 @@
                         this.isConnecting = false;
                         this.reconnectAttempts = 0;
                         this.connectionStartTime = new Date();
-                        this.updateConnectionStatus('connected', '已连接到 推理服务器 ');
+                        const connectedText = getTranslation('connected-inference', '已连接到 推理服务器');
+                        this.updateConnectionStatus('connected', connectedText);
                         
                         // 发送初始连接消息 (Socket.IO 握手)
                         this.ws.send('40');
@@ -845,20 +888,23 @@
                         console.log('WebSocket 连接已关闭:', event.code, event.reason);
                         this.isConnecting = false;
                         this.connectionStartTime = null;
-                        this.updateConnectionStatus('disconnected', '连接已断开');
+                        const disconnectedText = getTranslation('disconnected-inference', '连接已断开');
+                        this.updateConnectionStatus('disconnected', disconnectedText);
                         this.scheduleReconnect();
                     };
 
                     this.ws.onerror = (error) => {
                         console.error('WebSocket 错误:', error);
                         this.isConnecting = false;
-                        this.updateConnectionStatus('disconnected', '连接错误');
+                        const errorText = getTranslation('connection-error-inference', '连接错误');
+                        this.updateConnectionStatus('disconnected', errorText);
                     };
 
                 } catch (error) {
                     console.error('连接失败:', error);
                     this.isConnecting = false;
-                    this.updateConnectionStatus('disconnected', '连接失败');
+                    const errorText = getTranslation('connection-error-inference', '连接失败');
+                    this.updateConnectionStatus('disconnected', errorText);
                     this.scheduleReconnect();
                 }
             }
@@ -927,10 +973,11 @@
                 
                 cores.forEach(core => {
                     const usage = parseFloat(core.usage) || 0;
+                    const coreLabel = getTranslation('core', '核心');
                     
                     html += `
                         <div class="cpu-bar-item">
-                            <div class="cpu-bar-label">核心 ${core.id}</div>
+                            <div class="cpu-bar-label">${coreLabel} ${core.id}</div>
                             <div class="cpu-bar-container">
                                 <div class="cpu-bar-fill" style="width: ${usage}%">
                                     <div class="cpu-bar-value">${usage.toFixed(1)}%</div>
@@ -1047,7 +1094,7 @@
                 const powerItems = [
                     { label: 'GPU+SoC', data: powerData.gpu_soc },
                     { label: 'CPU', data: powerData.cpu_cv },
-                    { label: '系统 5V', data: powerData.sys_5v },
+                    { label: getTranslation('system-5v', '系统 5V'), data: powerData.sys_5v },
                     { label: 'RAM', data: powerData.ram }
                 ];
                 
@@ -1073,9 +1120,10 @@
                 let html = '<div class="cpu-chart" style="text-align: left !important;">';
                 
                 if (gpuData.gr3d_freq !== undefined) {
+                    const gpuFreqLabel = getTranslation('gpu-freq', '3D GPU 频率');
                     html += `
                         <div class="metric" style="text-align: left !important;">
-                            <span class="metric-label gpu-metric-label" style="text-align: left !important;">3D GPU 频率</span>
+                            <span class="metric-label gpu-metric-label" style="text-align: left !important;">${gpuFreqLabel}</span>
                             <span class="metric-value" style="text-align: left !important;">${gpuData.gr3d_freq}%</span>
                         </div>
                         <div class="progress-bar">
@@ -1085,7 +1133,8 @@
                 }
                 
                 html += '</div>';
-                content.innerHTML = html || '<div class="cpu-chart" style="text-align: left !important;"><div class="no-data">暂无 GPU 数据</div></div>';
+                const noDataText = getTranslation('no-gpu-data', '暂无 GPU 数据');
+                content.innerHTML = html || `<div class="cpu-chart" style="text-align: left !important;"><div class="no-data">${noDataText}</div></div>`;
             }
 
             updateConnectionStatus(status, message) {
@@ -1143,7 +1192,8 @@
                 if (this.isConnecting) return;
                 
                 this.isConnecting = true;
-                this.updateConnectionStatus('connecting', '正在连接到 应用服务器...');
+                const connectingText = getTranslation('connecting-application', '正在连接到 应用服务器...');
+                this.updateConnectionStatus('connecting', connectingText);
 
                 try {
                     // 连接到 应用服务器 服务器的 WebSocket (Socket.IO)
@@ -1154,7 +1204,8 @@
                         this.isConnecting = false;
                         this.reconnectAttempts = 0;
                         this.connectionStartTime = new Date();
-                        this.updateConnectionStatus('connected', '已连接到 应用服务器 ');
+                        const connectedText = getTranslation('connected-application', '已连接到 应用服务器');
+                        this.updateConnectionStatus('connected', connectedText);
                         
                         // 发送初始连接消息 (Socket.IO 握手)
                         this.ws.send('40');
@@ -1168,20 +1219,23 @@
                         console.log('应用服务器 WebSocket 连接已关闭:', event.code, event.reason);
                         this.isConnecting = false;
                         this.connectionStartTime = null;
-                        this.updateConnectionStatus('disconnected', '应用服务器 连接已断开');
+                        const disconnectedText = getTranslation('disconnected-application', '应用服务器 连接已断开');
+                        this.updateConnectionStatus('disconnected', disconnectedText);
                         this.scheduleReconnect();
                     };
 
                     this.ws.onerror = (error) => {
                         console.error('应用服务器 WebSocket 错误:', error);
                         this.isConnecting = false;
-                        this.updateConnectionStatus('disconnected', '应用服务器 连接错误');
+                        const errorText = getTranslation('connection-error-application', '应用服务器 连接错误');
+                        this.updateConnectionStatus('disconnected', errorText);
                     };
 
                 } catch (error) {
                     console.error('应用服务器 连接失败:', error);
                     this.isConnecting = false;
-                    this.updateConnectionStatus('disconnected', '应用服务器 连接失败');
+                    const errorText = getTranslation('connection-error-application', '应用服务器 连接失败');
+                    this.updateConnectionStatus('disconnected', errorText);
                     this.scheduleReconnect();
                 }
             }
@@ -1247,10 +1301,11 @@
                 
                 cores.forEach(core => {
                     const usage = parseFloat(core.usage) || 0;
+                    const coreLabel = getTranslation('core', '核心');
                     
                     html += `
                         <div class="cpu-bar-item">
-                            <div class="cpu-bar-label">核心 ${core.id}</div>
+                            <div class="cpu-bar-label">${coreLabel} ${core.id}</div>
                             <div class="cpu-bar-container">
                                 <div class="cpu-bar-fill" style="width: ${usage}%">
                                     <div class="cpu-bar-value">${usage.toFixed(1)}%</div>
@@ -1295,7 +1350,8 @@
                 }
                 
                 html += '</div>';
-                content.innerHTML = html || '<div class="cpu-chart" style="text-align: left !important;"><div class="no-data">暂无内存数据</div></div>';
+                const noDataText = getTranslation('no-memory-data', '暂无内存数据');
+                content.innerHTML = html || `<div class="cpu-chart" style="text-align: left !important;"><div class="no-data">${noDataText}</div></div>`;
             }
 
             updateTemperatureDisplay(tempData) {
@@ -1414,7 +1470,138 @@
             
             // 添加滚动监听器来实现文字颜色渐变
             initScrollColorTransition();
+            
+            // 初始化语言系统
+            initLanguageSystem();
         });
+
+        // 语言翻译系统
+        const translations = {
+            'zh': {
+                'title': 'RM - 01 Dashboard',
+                'subtitle': 'RobOS ( Rack on board ) 实时系统性能监控面板',
+                'connecting-inference': '正在连接到 推理服务器...',
+                'connecting-application': '正在连接到 应用服务器...',
+                'connected-inference': '已连接到 推理服务器',
+                'connected-application': '已连接到 应用服务器',
+                'disconnected-inference': '推理服务器 连接已断开',
+                'disconnected-application': '应用服务器 连接已断开',
+                'connection-error-inference': '推理服务器 连接错误',
+                'connection-error-application': '应用服务器 连接错误',
+                'inference-monitoring': '推理模组监控',
+                'application-monitoring': '应用模组监控',
+                'nvidia-status': 'NVIDIA 推理服务器系统状态',
+                'intel-status': 'Intel X86 应用服务器系统状态',
+                'cpu-monitoring': 'CPU 监控',
+                'memory-monitoring': '显存监控',
+                'ram-monitoring': '内存监控',
+                'temperature-monitoring': '温度监控',
+                'power-monitoring': '功耗监控',
+                'gpu-monitoring': 'GPU 监控',
+                'disk-monitoring': '磁盘监控',
+                'system-info': '系统信息',
+                'waiting-data': '等待数据...',
+                'last-update': '最后更新',
+                'connection-time': '连接时间',
+                'data-packets': '数据包',
+                'core': '核心',
+                'system-5v': '系统 5V',
+                'gpu-freq': '3D GPU 频率',
+                'no-gpu-data': '暂无 GPU 数据',
+                'no-memory-data': '暂无内存数据'
+            },
+            'en': {
+                'title': 'RM - 01 Dashboard',
+                'subtitle': 'RobOS ( Rack on board ) Real-time System Performance Monitor',
+                'connecting-inference': 'Connecting to Inference Server...',
+                'connecting-application': 'Connecting to Application Server...',
+                'connected-inference': 'Connected to Inference Server',
+                'connected-application': 'Connected to Application Server',
+                'disconnected-inference': 'Inference Server Disconnected',
+                'disconnected-application': 'Application Server Disconnected',
+                'connection-error-inference': 'Inference Server Connection Error',
+                'connection-error-application': 'Application Server Connection Error',
+                'inference-monitoring': 'Inference Module Monitor',
+                'application-monitoring': 'Application Module Monitor',
+                'nvidia-status': 'NVIDIA Inference Server System Status',
+                'intel-status': 'Intel X86 Application Server System Status',
+                'cpu-monitoring': 'CPU Monitor',
+                'memory-monitoring': 'VRAM Monitor',
+                'ram-monitoring': 'Memory Monitor',
+                'temperature-monitoring': 'Temperature Monitor',
+                'power-monitoring': 'Power Monitor',
+                'gpu-monitoring': 'GPU Monitor',
+                'disk-monitoring': 'Disk Monitor',
+                'system-info': 'System Information',
+                'waiting-data': 'Waiting for data...',
+                'last-update': 'Last Update',
+                'connection-time': 'Connection Time',
+                'data-packets': 'Data Packets',
+                'core': 'Core',
+                'system-5v': 'System 5V',
+                'gpu-freq': '3D GPU Frequency',
+                'no-gpu-data': 'No GPU Data Available',
+                'no-memory-data': 'No Memory Data Available'
+            }
+        };
+
+        let currentLanguage = 'zh';
+
+        function initLanguageSystem() {
+            // 从本地存储读取语言设置
+            const savedLanguage = localStorage.getItem('dashboard-language');
+            if (savedLanguage && translations[savedLanguage]) {
+                currentLanguage = savedLanguage;
+            }
+            
+            // 更新语言切换按钮显示
+            updateLanguageSwitcher();
+            
+            // 如果是英文，立即翻译
+            if (currentLanguage === 'en') {
+                translatePage('en');
+            }
+        }
+
+        function switchLanguage() {
+            currentLanguage = currentLanguage === 'zh' ? 'en' : 'zh';
+            localStorage.setItem('dashboard-language', currentLanguage);
+            updateLanguageSwitcher();
+            translatePage(currentLanguage);
+        }
+
+        function updateLanguageSwitcher() {
+            const langText = document.getElementById('langText');
+            if (langText) {
+                langText.textContent = currentLanguage === 'zh' ? 'EN' : '中文';
+            }
+        }
+
+        function translatePage(language) {
+            const elements = document.querySelectorAll('[data-translate]');
+            elements.forEach(element => {
+                const key = element.getAttribute('data-translate');
+                if (translations[language] && translations[language][key]) {
+                    element.textContent = translations[language][key];
+                }
+            });
+            
+            // 更新文档标题
+            if (language === 'en') {
+                document.title = 'RM-01 Dashboard - RobOS Monitor';
+                document.querySelector('meta[name="apple-mobile-web-app-title"]').content = 'RM - 01 Monitor Panel';
+            } else {
+                document.title = 'Rob OS';
+                document.querySelector('meta[name="apple-mobile-web-app-title"]').content = 'RM - 01 监控面板';
+            }
+        }
+
+        function getTranslation(key, fallback = '') {
+            if (translations[currentLanguage] && translations[currentLanguage][key]) {
+                return translations[currentLanguage][key];
+            }
+            return fallback || key;
+        }
 
         // 滚动颜色渐变功能
         function initScrollColorTransition() {
@@ -1423,6 +1610,8 @@
             const headerP = document.querySelector('.header p');
             const connectionStatus = document.querySelector('.connection-status');
             const connectionTexts = document.querySelectorAll('.connection-status span:not(.status-indicator)');
+            const languageSwitcher = document.querySelector('.language-switcher');
+            const langText = document.querySelector('.lang-text');
             
             // 计算10%滚动距离
             const maxScroll = window.innerHeight * 0.1;
@@ -1456,6 +1645,10 @@
                 }
                 if (headerP) headerP.style.color = colorValue;
                 if (connectionStatus) connectionStatus.style.color = colorValue;
+                
+                // 更新语言切换按钮颜色
+                if (languageSwitcher) languageSwitcher.style.color = colorValue;
+                if (langText) langText.style.color = colorValue;
                 
                 // 更新连接状态文字颜色
                 connectionTexts.forEach(text => {
