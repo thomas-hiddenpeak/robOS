@@ -172,6 +172,9 @@
             box-shadow: 0 8px 32px rgba(0,0,0,0.1);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.18);
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
 
         .card-header {
@@ -224,6 +227,8 @@
             border-radius: 10px;
             overflow: hidden;
             margin: 5px 0;
+            position: relative;
+            box-sizing: border-box;
         }
 
         .progress-fill {
@@ -236,6 +241,9 @@
             color: white;
             font-size: 12px;
             font-weight: bold;
+            position: relative;
+            box-sizing: border-box;
+            max-width: 100%;
         }
 
         .cpu-cores {
@@ -434,16 +442,24 @@
 
         .lpmu-temperature-grid {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             gap: 8px;
             margin-top: 10px;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
 
         .disk-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(6, 200px);
             gap: 10px;
             margin-top: 10px;
+            justify-content: start;
+            width: 100%;
+            box-sizing: border-box;
+            overflow-x: auto;
+            overflow-y: hidden;
         }
 
         .disk-item {
@@ -452,14 +468,25 @@
             padding: 12px;
             text-align: left;
             border: 1px solid #e9ecef;
+            min-height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
 
         .disk-label {
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             color: #666;
             margin-bottom: 8px;
             font-weight: 500;
             text-align: left;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .disk-usage {
@@ -482,13 +509,20 @@
             padding: 10px;
             text-align: left;
             border: 1px solid #e9ecef;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
 
         .temp-label {
-            font-size: 0.9rem;
+            font-size: 0.75rem;
             color: #666;
             margin-bottom: 5px;
             text-align: left;
+            line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .temp-value {
@@ -558,11 +592,11 @@
 
         @media (max-width: 1200px) {
             .lpmu-temperature-grid {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(4, 1fr);
             }
             
             .disk-grid {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(4, 200px);
             }
         }
 
@@ -636,11 +670,11 @@
             }
 
             .lpmu-temperature-grid {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(3, 1fr);
             }
             
             .disk-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 200px);
             }
 
             .system-header h2 {
