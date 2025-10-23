@@ -1077,7 +1077,7 @@
                     
                     html += `
                         <div class="cpu-bar-item">
-                            <div class="cpu-bar-label">${coreLabel} ${core.id}</div>
+                            <div class="cpu-bar-label">${coreLabel} ${core.id + 1}</div>
                             <div class="cpu-bar-container">
                                 <div class="cpu-bar-fill" style="width: ${barWidth}%; min-width: 28px;">
                                     <div class="cpu-bar-value">${usage.toFixed(1)}%</div>
@@ -1447,7 +1447,7 @@
                     
                     html += `
                         <div class="cpu-bar-item">
-                            <div class="cpu-bar-label">${coreLabel} ${core.id}</div>
+                            <div class="cpu-bar-label">${coreLabel} ${core.id + 1}</div>
                             <div class="cpu-bar-container">
                                 <div class="cpu-bar-fill" style="width: ${barWidth}%; min-width: 28px;">
                                     <div class="cpu-bar-value">${usage.toFixed(1)}%</div>
