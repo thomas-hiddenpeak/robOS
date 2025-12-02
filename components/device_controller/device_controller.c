@@ -140,7 +140,7 @@ esp_err_t device_controller_agx_power_on(void) {
 
   ESP_LOGI(TAG, "Powering on AGX device");
 
-  // AGX power on: GPIO3 = LOW
+  // AGX power on: GPIO3 = LOW (hardware: LOW=ON)
   esp_err_t ret = gpio_controller_set_output(AGX_POWER_PIN, GPIO_STATE_LOW);
   if (ret == ESP_OK) {
     s_device_status.agx_power_state = POWER_STATE_ON;
@@ -167,7 +167,7 @@ esp_err_t device_controller_agx_power_off(void) {
 
   ESP_LOGI(TAG, "Powering off AGX device");
 
-  // AGX power off: GPIO3 = HIGH
+  // AGX power off: GPIO3 = HIGH (hardware: HIGH=OFF)
   esp_err_t ret = gpio_controller_set_output(AGX_POWER_PIN, GPIO_STATE_HIGH);
   if (ret == ESP_OK) {
     s_device_status.agx_power_state = POWER_STATE_OFF;

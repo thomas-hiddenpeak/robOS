@@ -372,8 +372,8 @@ esp_err_t touch_led_start_animation(touch_led_animation_t animation,
 
   ESP_LOGI(TAG, "Started animation %d with speed %d", animation, speed);
 
-  // Auto-save configuration
-  touch_led_save_config();
+  // Note: Do not auto-save here to avoid NVS writes during critical operations
+  // Users should explicitly save if needed
 
   return ESP_OK;
 }
@@ -395,8 +395,8 @@ esp_err_t touch_led_stop_animation(void) {
   s_touch_led.current_animation = TOUCH_LED_ANIM_NONE;
   ESP_LOGI(TAG, "Animation stopped");
 
-  // Auto-save configuration
-  touch_led_save_config();
+  // Note: Do not auto-save here to avoid NVS writes during critical operations
+  // Users should explicitly save if needed
 
   return ESP_OK;
 }

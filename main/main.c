@@ -36,6 +36,7 @@
 #include "storage_manager.h"
 #include "touch_led.h"
 #include "usb_mux_controller.h"
+#include "voltage_protection.h"
 #include "web_server.h"
 
 static const char *TAG = "ROBOS_MAIN";
@@ -546,6 +547,55 @@ static esp_err_t system_init(void) {
                  esp_err_to_name(ret));
       } else {
         ESP_LOGI(TAG, "Power monitor console commands registered");
+      }
+
+      // Start power monitoring
+      ret = power_monitor_start();
+      if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to start power monitor: %s",
+                 esp_err_to_name(ret));
+      } else {
+        ESP_LOGI(TAG, "Power monitor started");
+      }
+    }
+  }
+
+  // 9.5. Voltage Protection (automatic low voltage protection system)
+  ESP_LOGI(TAG, "Initializing voltage protection...");
+  voltage_protection_config_t vp_config;
+  ret = voltage_protection_get_default_config(&vp_config);
+  if (ret != ESP_OK) {
+    ESP_LOGE(TAG, "Failed to get voltage protection default config: %s",
+             esp_err_to_name(ret));
+    ESP_LOGW(TAG, "Continuing without voltage protection functionality");
+  } else {
+    ret = voltage_protection_init(&vp_config);
+    if (ret != ESP_OK) {
+      ESP_LOGE(TAG, "Failed to initialize voltage protection: %s",
+               esp_err_to_name(ret));
+      ESP_LOGW(TAG, "Continuing without voltage protection functionality");
+    } else {
+      ESP_LOGI(TAG,
+               "Voltage protection initialized (Low: %.1fV, Recovery: %.1fV)",
+               vp_config.low_voltage_threshold,
+               vp_config.recovery_voltage_threshold);
+
+      // Register voltage protection console commands
+      ret = voltage_protection_register_console_commands();
+      if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to register voltage protection commands: %s",
+                 esp_err_to_name(ret));
+      } else {
+        ESP_LOGI(TAG, "Voltage protection console commands registered");
+      }
+
+      // Start voltage protection monitoring
+      ret = voltage_protection_start();
+      if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to start voltage protection: %s",
+                 esp_err_to_name(ret));
+      } else {
+        ESP_LOGI(TAG, "Voltage protection monitoring started");
       }
     }
   }

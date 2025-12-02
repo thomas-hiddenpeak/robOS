@@ -51,6 +51,7 @@ extern "C" {
 
 // Timing configurations
 #define AGX_RESET_PULSE_MS 1000 ///< AGX reset pulse duration (ms)
+#define AGX_POWER_PULSE_MS 500  ///< AGX power button pulse duration (ms)
 #define LPMU_POWER_PULSE_MS 300 ///< LPMU power button pulse duration (ms)
 #define LPMU_RESET_PULSE_MS 300 ///< LPMU reset pulse duration (ms)
 
