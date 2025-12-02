@@ -35,6 +35,7 @@
 - ✅ **AGX监控组件** - WebSocket实时监控，CPU温度集成，静默运行模式
 - ✅ **Matrix LED组件** - 32x32 WS2812矩阵控制，支持像素绘图、动画播放
 - ✅ **智能温度管理** - 多层次安全保护，AGX数据集成，调试模式兼容
+- ✅ **电压保护系统** - 自动低电压保护，设备安全关机/恢复，外设复位控制
 - 📋 **系统监控组件** - 待开发
 
 ## 🏗️ 项目架构
@@ -58,6 +59,7 @@ robOS/
 │   ├── ethernet_manager/         # 以太网管理组件
 │   ├── storage_manager/          # 存储管理组件
 │   ├── power_monitor/            # 电源监控组件
+│   ├── voltage_protection/       # 电压保护组件 🔋
 │   ├── device_manager/           # 设备管理组件
 │   ├── system_monitor/           # 系统监控组件
 │   └── event_manager/            # 事件管理组件
@@ -80,6 +82,7 @@ robOS/
 - **ethernet_manager**: W5500控制、DHCP服务器、网关功能
 - **storage_manager**: TF卡管理、文件系统操作、NVS配置管理
 - **power_monitor**: 电压监测、电源芯片通信、功率监控
+- **voltage_protection**: 🔋 低电压保护、自动设备关机/恢复、外设复位控制、ESP32重启恢复
 - **device_manager**: AGX、Orin、N305等设备电源控制和状态监控
 - **system_monitor**: ESP32S3系统状态、内存使用、温度监控
 - **event_manager**: 事件驱动的组件间通信和状态同步机制
@@ -1299,6 +1302,53 @@ robOS 提供了功能强大的色彩校正系统，专门为 WS2812 LED 设备�
 - `dhcp_pool_end` - DHCP池结束IP (x.x.x.x 格式)
 - `dhcp_lease_hours` - DHCP租期小时数 (1-8760)
 - `dhcp_max_clients` - 最大DHCP客户端数 (1-50)
+
+### 🔋 电压保护命令
+
+robOS 集成了智能电压保护系统，自动监控供电电压并在低电压情况下执行设备安全关机和恢复流程，保护硬件设备免受欠压损坏。
+
+| 命令 | 说明 | 示例 |
+|------|------|------|
+| `voltprot status` | 显示电压保护状态 | `voltprot status` |
+| `voltprot test` | 触发测试模式（模拟低电压） | `voltprot test` |
+| `voltprot reset` | 重置保护状态并重启系统 | `voltprot reset` |
+| `voltprot debug` | 显示调试信息 | `voltprot debug` |
+| `voltprot ledtest` | 测试Touch LED警告效果 | `voltprot ledtest` |
+
+**电压保护功能特性**:
+- **自动电压监控**: 实时监测供电电压，默认阈值12.6V（低电压）/ 18.0V（恢复）
+- **设备安全关机**: 低电压时自动关机AGX/LPMU设备，避免硬件损坏
+- **外设复位控制**: 对W5500网络芯片、RTL8367交换机执行复位保护
+- **AGX复位控制**: 使用GPIO1复位引脚将AGX保持在复位状态（低电压下不断电但不运行）
+- **分阶段关机**: 60秒延时关闭风扇，确保设备完全冷却
+- **自动恢复**: 电压恢复18V以上并持续5秒后，ESP32-S3自动重启恢复系统
+- **LED视觉反馈**: Touch LED橙色呼吸动画提示低电压状态
+- **启动过滤**: 过滤启动时<5V的无效电压读数，避免误触发
+
+**电压保护状态显示示例**:
+```
+=== Voltage Protection Status ===
+State: 正常运行
+Voltage: 19.2V
+Protection Count: 0
+
+Device Status (tracked by voltage_protection):
+AGX: ON (Connected)
+LPMU: ON
+```
+
+**工作流程**:
+1. **正常运行** → 电压低于12.6V → **低电压保护**（60秒倒计时）
+2. **低电压保护** → 倒计时结束 → **关机中**（执行设备关机和外设复位）
+3. **关机中** → 完成关机 → **保护状态**（60秒后停止风扇）
+4. **保护状态** → 电压恢复18V以上 → **电压恢复中**（5秒持续确认）
+5. **电压恢复中** → 确认稳定 → **ESP32-S3重启**（系统自动恢复正常）
+
+**硬件控制详情**:
+- AGX控制：GPIO1（复位引脚）拉高=复位状态，拉低=正常运行
+- W5500复位：GPIO39拉低=复位状态，拉高=正常运行
+- RTL8367复位：GPIO17拉高=复位状态，拉低=正常运行
+- 风扇控制：60秒延迟后关闭，确保设备散热
 
 ### 🔧 系统命令
 | 命令 | 说明 | 示例 |
