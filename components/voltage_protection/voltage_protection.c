@@ -10,7 +10,10 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "gpio_controller.h"
+#include "lwip/inet.h"
+#include "lwip/netdb.h"
 #include "matrix_led.h"
+#include "ping/ping_sock.h"
 #include "power_monitor.h"
 #include "touch_led.h"
 #include <string.h>
@@ -50,6 +53,148 @@ static void voltage_protection_check_device_status(void);
 static void voltage_protection_execute_shutdown(void);
 static void voltage_protection_execute_recovery(void);
 static void voltage_protection_update_led_status(void);
+
+// Ping callback data
+typedef struct {
+  uint32_t transmitted;
+  uint32_t received;
+  uint32_t total_time_ms;
+  bool completed;
+} ping_result_t;
+
+static void ping_success_cb(esp_ping_handle_t hdl, void *args) {
+  uint8_t ttl;
+  uint16_t seqno;
+  uint32_t elapsed_time;
+  ip_addr_t target_addr;
+
+  esp_ping_get_profile(hdl, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
+  esp_ping_get_profile(hdl, ESP_PING_PROF_TTL, &ttl, sizeof(ttl));
+  esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR, &target_addr,
+                       sizeof(target_addr));
+  esp_ping_get_profile(hdl, ESP_PING_PROF_TIMEGAP, &elapsed_time,
+                       sizeof(elapsed_time));
+
+  ESP_LOGI(TAG, "Ping success: %s icmp_seq=%d ttl=%d time=%lu ms",
+           inet_ntoa(target_addr.u_addr.ip4), seqno, ttl,
+           (unsigned long)elapsed_time);
+}
+
+static void ping_timeout_cb(esp_ping_handle_t hdl, void *args) {
+  uint16_t seqno;
+  ip_addr_t target_addr;
+
+  esp_ping_get_profile(hdl, ESP_PING_PROF_SEQNO, &seqno, sizeof(seqno));
+  esp_ping_get_profile(hdl, ESP_PING_PROF_IPADDR, &target_addr,
+                       sizeof(target_addr));
+
+  ESP_LOGW(TAG, "Ping timeout: %s icmp_seq=%d",
+           inet_ntoa(target_addr.u_addr.ip4), seqno);
+}
+
+static void ping_end_cb(esp_ping_handle_t hdl, void *args) {
+  ping_result_t *result = (ping_result_t *)args;
+  if (result) {
+    // Get final statistics from profile
+    esp_ping_get_profile(hdl, ESP_PING_PROF_REQUEST, &result->transmitted,
+                         sizeof(result->transmitted));
+    esp_ping_get_profile(hdl, ESP_PING_PROF_REPLY, &result->received,
+                         sizeof(result->received));
+    esp_ping_get_profile(hdl, ESP_PING_PROF_DURATION, &result->total_time_ms,
+                         sizeof(result->total_time_ms));
+    result->completed = true;
+
+    ESP_LOGI(
+        TAG,
+        "Ping completed: %lu packets transmitted, %lu received, time %lu ms",
+        (unsigned long)result->transmitted, (unsigned long)result->received,
+        (unsigned long)result->total_time_ms);
+  }
+}
+
+/**
+ * @brief Check if a device is online by pinging its IP address
+ * @param ip_addr IP address string (e.g., "10.10.99.99")
+ * @return true if device responds to ping, false otherwise
+ */
+static bool is_device_online(const char *ip_addr) {
+  ESP_LOGI(TAG, "Checking if device %s is online via ping...", ip_addr);
+
+  esp_ping_config_t ping_config = ESP_PING_DEFAULT_CONFIG();
+
+  // Parse IP address
+  ip_addr_t target_addr;
+  struct addrinfo hint;
+  struct addrinfo *res = NULL;
+  memset(&hint, 0, sizeof(hint));
+
+  int ret = getaddrinfo(ip_addr, NULL, &hint, &res);
+  if (ret != 0 || res == NULL) {
+    ESP_LOGW(TAG, "Failed to resolve IP address: %s", ip_addr);
+    return false;
+  }
+
+  struct in_addr addr4 = ((struct sockaddr_in *)(res->ai_addr))->sin_addr;
+  inet_addr_to_ip4addr(ip_2_ip4(&target_addr), &addr4);
+  freeaddrinfo(res);
+
+  ping_config.target_addr = target_addr;
+  ping_config.count = 3;         // Send 3 pings for reliability
+  ping_config.timeout_ms = 1000; // 1 second timeout per ping
+  ping_config.interval_ms = 100; // 100ms between pings
+
+  // Setup result tracking
+  ping_result_t result = {0};
+
+  // Setup callbacks (matching official ESP-IDF examples)
+  esp_ping_callbacks_t cbs = {.cb_args = &result,
+                              .on_ping_success = ping_success_cb,
+                              .on_ping_timeout = ping_timeout_cb,
+                              .on_ping_end = ping_end_cb};
+
+  esp_ping_handle_t ping_handle;
+  ret = esp_ping_new_session(&ping_config, &cbs, &ping_handle);
+  if (ret != ESP_OK) {
+    ESP_LOGW(TAG, "Failed to create ping session for %s: %s", ip_addr,
+             esp_err_to_name(ret));
+    return false;
+  }
+
+  // Start ping
+  ret = esp_ping_start(ping_handle);
+  if (ret != ESP_OK) {
+    ESP_LOGW(TAG, "Failed to start ping to %s: %s", ip_addr,
+             esp_err_to_name(ret));
+    esp_ping_delete_session(ping_handle);
+    return false;
+  }
+
+  ESP_LOGI(TAG, "Ping started, waiting for response from %s...", ip_addr);
+
+  // Wait for ping to complete (3 pings * 1s + intervals + buffer)
+  for (int i = 0; i < 40 && !result.completed; i++) {
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+
+  // Stop and cleanup
+  esp_ping_stop(ping_handle);
+  esp_ping_delete_session(ping_handle);
+
+  if (!result.completed) {
+    ESP_LOGW(TAG, "Ping did not complete within timeout for %s", ip_addr);
+    return false;
+  }
+
+  if (result.received > 0) {
+    ESP_LOGI(TAG, "Device %s is ONLINE (received %lu/%lu pings)", ip_addr,
+             (unsigned long)result.received, (unsigned long)result.transmitted);
+    return true;
+  } else {
+    ESP_LOGW(TAG, "Device %s is OFFLINE (no ping response, sent %lu)", ip_addr,
+             (unsigned long)result.transmitted);
+    return false;
+  }
+}
 
 esp_err_t
 voltage_protection_get_default_config(voltage_protection_config_t *config) {
@@ -487,12 +632,32 @@ static void voltage_protection_execute_shutdown(void) {
     gpio_controller_set_output(1, GPIO_STATE_HIGH); // AGX_RESET_PIN
   }
 
+  // TODO: Temporarily disabled W5500 and RTL8367 reset for troubleshooting
+  // W5500 and RTL8367 not recovering properly after reset, investigating issue
   // W5500 reset pin: pull LOW to assert reset
-  gpio_controller_set_output(39, GPIO_STATE_LOW); // W5500_RST_GPIO
+  // gpio_controller_set_output(39, GPIO_STATE_LOW); // W5500_RST_GPIO
   // RTL8367 switch reset pin: pull HIGH to assert reset
-  gpio_controller_set_output(17, GPIO_STATE_HIGH); // RTL8367_RST
-  if (s_vp_state.lpmu_powered)
-    device_controller_lpmu_power_toggle();
+  // gpio_controller_set_output(17, GPIO_STATE_HIGH); // RTL8367_RST
+  ESP_LOGW(TAG, "W5500/RTL8367 reset temporarily disabled for troubleshooting");
+
+  // LPMU shutdown: Verify device is actually running before shutdown
+  if (s_vp_state.lpmu_powered) {
+    ESP_LOGI(TAG,
+             "LPMU reported as powered on, checking if actually running...");
+
+    // Ping LPMU to confirm it's actually online
+    bool lpmu_online = is_device_online("10.10.99.99");
+
+    if (lpmu_online) {
+      ESP_LOGI(TAG, "LPMU confirmed online via ping, executing shutdown");
+      device_controller_lpmu_power_toggle();
+    } else {
+      ESP_LOGW(TAG, "LPMU not responding to ping, skipping shutdown (may "
+                    "already be off)");
+    }
+  } else {
+    ESP_LOGI(TAG, "LPMU already powered off, skipping shutdown");
+  }
   if (s_vp_state.config.enable_matrix_led_control) {
     matrix_led_clear();
     matrix_led_refresh();
