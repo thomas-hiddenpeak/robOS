@@ -576,11 +576,26 @@ static void voltage_protection_check_voltage(float voltage) {
     }
     break;
   case VOLTAGE_PROTECTION_STATE_LOW_VOLTAGE:
+    if (voltage >= s_vp_state.config.recovery_voltage_threshold) {
+      // Voltage recovered during countdown - cancel shutdown and return to
+      // normal
+      ESP_LOGI(TAG,
+               "[STATE CHANGE] LOW_VOLTAGE -> NORMAL: %.2fV >= %.2fV "
+               "(countdown canceled)",
+               voltage, s_vp_state.config.recovery_voltage_threshold);
+      s_vp_state.state = VOLTAGE_PROTECTION_STATE_NORMAL;
+      s_vp_state.countdown_remaining_sec = 0;
+    }
+    break;
   case VOLTAGE_PROTECTION_STATE_PROTECTED:
     if (voltage >= s_vp_state.config.recovery_voltage_threshold) {
+      // Voltage recovered after shutdown - need to restart to recover system
+      ESP_LOGI(TAG,
+               "[STATE CHANGE] PROTECTED -> RECOVERY: %.2fV >= %.2fV (will "
+               "restart after hold)",
+               voltage, s_vp_state.config.recovery_voltage_threshold);
       s_vp_state.state = VOLTAGE_PROTECTION_STATE_RECOVERY;
       s_vp_state.recovery_timer_sec = s_vp_state.config.recovery_hold_sec;
-      s_vp_state.countdown_remaining_sec = 0;
     }
     break;
   case VOLTAGE_PROTECTION_STATE_RECOVERY:
