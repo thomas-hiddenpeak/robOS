@@ -350,6 +350,15 @@
             border-radius: 10px;
         }
 
+        /* 系统信息卡片：不需要白底底板（避免与玻璃拟态卡片风格冲突） */
+        #systemContent .memory-chart,
+        #lpmuSystemContent .memory-chart {
+            margin-top: 0;
+            padding: 0;
+            background: transparent;
+            border-radius: 0;
+        }
+
         .memory-item {
             display: flex;
             flex-direction: column;
@@ -1209,6 +1218,9 @@
     </div>
 
     <script>
+        // 控制台调试开关（生产环境建议保持 false，避免高频数据包导致页面卡顿）
+        const DEBUG_DASHBOARD_LOGS = false;
+
         // WebSocket 连接管理
         class 推理服务器Monitor {
             constructor() {
@@ -1216,6 +1228,7 @@
                 this.reconnectInterval = 3000;
                 this.maxReconnectAttempts = 5;
                 this.reconnectAttempts = 0;
+                this.reconnectTimer = null;
                 this.connectionStartTime = null;
                 this.dataPacketCount = 0;
                 this.isConnecting = false;
@@ -1236,11 +1249,22 @@
                 this.updateConnectionStatus('connecting', connectingText);
 
                 try {
+                    // 清理旧连接，避免多次重连导致的资源泄露/并发连接
+                    if (this.ws) {
+                        try { this.ws.onopen = this.ws.onmessage = this.ws.onclose = this.ws.onerror = null; } catch (e) {}
+                        try { this.ws.close(); } catch (e) {}
+                        this.ws = null;
+                    }
+                    if (this.reconnectTimer) {
+                        clearTimeout(this.reconnectTimer);
+                        this.reconnectTimer = null;
+                    }
+
                     // 连接到 推理服务器 服务器的 WebSocket
                     this.ws = new WebSocket('ws://10.10.99.98:58090/socket.io/?EIO=4&transport=websocket');
                     
                     this.ws.onopen = () => {
-                        console.log('WebSocket 连接已建立');
+                        if (DEBUG_DASHBOARD_LOGS) console.log('WebSocket 连接已建立');
                         this.isConnecting = false;
                         this.reconnectAttempts = 0;
                         this.connectionStartTime = new Date();
@@ -1256,7 +1280,7 @@
                     };
 
                     this.ws.onclose = (event) => {
-                        console.log('WebSocket 连接已关闭:', event.code, event.reason);
+                        if (DEBUG_DASHBOARD_LOGS) console.log('WebSocket 连接已关闭:', event.code, event.reason);
                         this.isConnecting = false;
                         this.connectionStartTime = null;
                         const disconnectedText = getTranslation('disconnected-inference', '连接已断开');
@@ -1265,10 +1289,11 @@
                     };
 
                     this.ws.onerror = (error) => {
-                        console.error('WebSocket 错误:', error);
+                        if (DEBUG_DASHBOARD_LOGS) console.error('WebSocket 错误:', error);
                         this.isConnecting = false;
                         const errorText = getTranslation('connection-error-inference', '连接错误');
                         this.updateConnectionStatus('disconnected', errorText);
+                        this.scheduleReconnect();
                     };
 
                 } catch (error) {
@@ -1281,7 +1306,7 @@
             }
 
             handleMessage(data) {
-                console.log('收到消息:', data);
+                if (DEBUG_DASHBOARD_LOGS) console.log('收到消息:', data);
                 
                 // 处理 Socket.IO 消息格式
                 if (data.startsWith('42')) {
@@ -1299,7 +1324,7 @@
                     }
                 } else if (data === '40') {
                     // Socket.IO 握手确认
-                    console.log('Socket.IO 握手完成');
+                    if (DEBUG_DASHBOARD_LOGS) console.log('Socket.IO 握手完成');
                 } else if (data.startsWith('2')) {
                     // Ping frame - 回复 pong
                     this.ws.send('3');
@@ -1307,7 +1332,7 @@
             }
 
             updateSystemData(data) {
-                console.log('更新系统数据:', data);
+                if (DEBUG_DASHBOARD_LOGS) console.log('更新系统数据:', data);
                 
                 // 更新 CPU 数据
                 this.updateCPUDisplay(data.cpu);
@@ -1559,10 +1584,15 @@
             }
 
             scheduleReconnect() {
+                if (this.reconnectTimer) return; // 防止重复定时器
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
+
                 this.reconnectAttempts++;
-                const delay = this.reconnectInterval;
-                
-                setTimeout(() => {
+                const backoffFactor = Math.min(this.reconnectAttempts, 5);
+                const delay = this.reconnectInterval * backoffFactor;
+
+                this.reconnectTimer = setTimeout(() => {
+                    this.reconnectTimer = null;
                     this.connect();
                 }, delay);
             }
@@ -1589,6 +1619,7 @@
                 this.reconnectInterval = 3000;
                 this.maxReconnectAttempts = 5;
                 this.reconnectAttempts = 0;
+                this.reconnectTimer = null;
                 this.connectionStartTime = null;
                 this.dataPacketCount = 0;
                 this.isConnecting = false;
@@ -1609,11 +1640,22 @@
                 this.updateConnectionStatus('connecting', connectingText);
 
                 try {
+                    // 清理旧连接，避免多次重连导致的资源泄露/并发连接
+                    if (this.ws) {
+                        try { this.ws.onopen = this.ws.onmessage = this.ws.onclose = this.ws.onerror = null; } catch (e) {}
+                        try { this.ws.close(); } catch (e) {}
+                        this.ws = null;
+                    }
+                    if (this.reconnectTimer) {
+                        clearTimeout(this.reconnectTimer);
+                        this.reconnectTimer = null;
+                    }
+
                     // 连接到 应用服务器 服务器的 WebSocket (Socket.IO)
                     this.ws = new WebSocket('ws://10.10.99.99:59090/socket.io/?EIO=4&transport=websocket');
                     
                     this.ws.onopen = () => {
-                        console.log('应用服务器 WebSocket 连接已建立');
+                        if (DEBUG_DASHBOARD_LOGS) console.log('应用服务器 WebSocket 连接已建立');
                         this.isConnecting = false;
                         this.reconnectAttempts = 0;
                         this.connectionStartTime = new Date();
@@ -1629,7 +1671,7 @@
                     };
 
                     this.ws.onclose = (event) => {
-                        console.log('应用服务器 WebSocket 连接已关闭:', event.code, event.reason);
+                        if (DEBUG_DASHBOARD_LOGS) console.log('应用服务器 WebSocket 连接已关闭:', event.code, event.reason);
                         this.isConnecting = false;
                         this.connectionStartTime = null;
                         const disconnectedText = getTranslation('disconnected-application', '应用服务器 连接已断开');
@@ -1638,10 +1680,11 @@
                     };
 
                     this.ws.onerror = (error) => {
-                        console.error('应用服务器 WebSocket 错误:', error);
+                        if (DEBUG_DASHBOARD_LOGS) console.error('应用服务器 WebSocket 错误:', error);
                         this.isConnecting = false;
                         const errorText = getTranslation('connection-error-application', '应用服务器 连接错误');
                         this.updateConnectionStatus('disconnected', errorText);
+                        this.scheduleReconnect();
                     };
 
                 } catch (error) {
@@ -1654,7 +1697,7 @@
             }
 
             handleMessage(data) {
-                console.log('应用服务器 收到消息:', data);
+                if (DEBUG_DASHBOARD_LOGS) console.log('应用服务器 收到消息:', data);
                 
                 // 处理 Socket.IO 消息格式
                 if (data.startsWith('42')) {
@@ -1672,7 +1715,7 @@
                     }
                 } else if (data === '40') {
                     // Socket.IO 握手确认
-                    console.log('应用服务器 Socket.IO 握手完成');
+                    if (DEBUG_DASHBOARD_LOGS) console.log('应用服务器 Socket.IO 握手完成');
                 } else if (data.startsWith('2')) {
                     // Ping frame - 回复 pong
                     this.ws.send('3');
@@ -1680,7 +1723,7 @@
             }
 
             updateSystemData(data) {
-                console.log('更新 应用服务器 系统数据:', data);
+                if (DEBUG_DASHBOARD_LOGS) console.log('更新 应用服务器 系统数据:', data);
                 
                 // 更新 CPU 数据
                 this.updateCPUDisplay(data.cpu);
@@ -1891,10 +1934,15 @@
             }
 
             scheduleReconnect() {
+                if (this.reconnectTimer) return; // 防止重复定时器
+                if (this.reconnectAttempts >= this.maxReconnectAttempts) return;
+
                 this.reconnectAttempts++;
-                const delay = this.reconnectInterval;
-                
-                setTimeout(() => {
+                const backoffFactor = Math.min(this.reconnectAttempts, 5);
+                const delay = this.reconnectInterval * backoffFactor;
+
+                this.reconnectTimer = setTimeout(() => {
+                    this.reconnectTimer = null;
                     this.connect();
                 }, delay);
             }
@@ -1954,17 +2002,21 @@
                 logWindow.classList.toggle('expanded');
                 icon.classList.toggle('collapsed');
                 
-                // 如果展开，立即获取日志并滚动到底部
+                // 如果展开，立即渲染全部缓存并强制抓取一次最新日志
                 if (logWindow.classList.contains('expanded')) {
                     // 检查模型是否已启用
                     const modelData = modelDataCache[modelType];
                     if (modelData && modelData.is_enabled) {
+                        renderModelLogWindow(modelType);
                         fetchModelLogs(modelType);
                     }
                     
                     setTimeout(() => {
                         logWindow.scrollTop = logWindow.scrollHeight;
                     }, 300);
+                } else {
+                    // 折叠：仍然持续采集，但只渲染尾部，避免 DOM 太大
+                    renderModelLogWindow(modelType);
                 }
             }
         }
@@ -2024,7 +2076,10 @@
             // 如果没有有效数据，保持初始状态
             if (!modelData) {
                 progressBar.style.width = '100%';  // 使用满宽以显示文字
-                statusText.textContent = '--';
+                statusText.textContent = getTranslation(
+                    'inference-engine-starting',
+                    '推理引擎启动中，等待模型加载数据'
+                );
                 progressBar.classList.remove('loading');
                 progressBar.style.background = 'linear-gradient(90deg, #E0E0E0, #BDBDBD)';
                 statusText.style.color = '#666';
@@ -2032,7 +2087,25 @@
             }
             
             // 计算显示进度
-            const actualProgress = modelData.progress || 0;
+            let actualProgress = modelData.progress || 0;
+            // 以“启动完成”为准，避免出现“已完成但进度停在 75%/90%”
+            if (modelData.startup_complete) {
+                actualProgress = 100;
+            }
+            
+            // 模型已启用但尚未开始加载：不显示 0%，显示指定文案
+            const isEnabledButNotStarted = !!modelData.is_enabled && !modelData.startup_complete && actualProgress === 0;
+            if (isEnabledButNotStarted) {
+                progressBar.style.width = '100%';
+                statusText.textContent = getTranslation(
+                    'inference-engine-starting',
+                    '推理引擎启动中，等待模型加载数据'
+                );
+                progressBar.classList.remove('loading');
+                progressBar.style.background = 'linear-gradient(90deg, #E0E0E0, #BDBDBD)';
+                statusText.style.color = '#666';
+                return;
+            }
             // 确保进度条至少有一定宽度以显示文字
             const displayProgress = actualProgress > 0 ? Math.max(actualProgress, 20) : 100;
             progressBar.style.width = displayProgress + '%';
@@ -2041,7 +2114,7 @@
             statusText.textContent = translateStatusText(modelData.status_text) || '--';
             
             // 根据状态决定是否显示加载动画和颜色
-            const isLoading = actualProgress > 0 && actualProgress < 100 && modelData.is_enabled;
+            const isLoading = actualProgress > 0 && actualProgress < 100 && modelData.is_enabled && !modelData.startup_complete;
             
             if (isLoading) {
                 // 正在加载 - 使用 CSS 动画，清除 inline background 让 CSS 类生效
@@ -2058,6 +2131,7 @@
                     statusText.style.color = '#666';
                 } else if (modelData.startup_complete) {
                     // 启动完成 - 绿色
+                    progressBar.style.width = '100%';
                     progressBar.style.background = 'linear-gradient(90deg, #4CAF50, #45a049)';
                     statusText.style.color = 'white';
                 } else if (actualProgress === 0) {
@@ -2093,13 +2167,45 @@
         }
         
         // 日志获取状态
-        const logFetchState = {
-            llm: { lastFetch: 0, enabled: false },
-            embedding: { lastFetch: 0, enabled: false },
-            reranker: { lastFetch: 0, enabled: false }
+        const MODEL_LOG_POLL_INTERVAL_MS = 2000;
+        const MODEL_LOG_LINES_PER_FETCH = 2000;       // 单次拉取行数（后端若支持更大，可再上调）
+        const MODEL_LOG_MAX_STORED_LINES = 20000;     // 前端最多缓存行数（防止无限增长导致卡顿/内存过大）
+        const MODEL_LOG_RENDER_COLLAPSED_LINES = 80;  // 折叠时渲染的尾部行数（展开可查看全部缓存）
+        
+        let modelLogPollInterval = null;
+        
+        const modelLogState = {
+            llm: { lastFetch: 0, controller: null, lines: [], lastRenderedCount: 0, lastRenderedMode: null, lastRenderedTailStart: 0, forceFullRender: false },
+            embedding: { lastFetch: 0, controller: null, lines: [], lastRenderedCount: 0, lastRenderedMode: null, lastRenderedTailStart: 0, forceFullRender: false },
+            reranker: { lastFetch: 0, controller: null, lines: [], lastRenderedCount: 0, lastRenderedMode: null, lastRenderedTailStart: 0, forceFullRender: false }
         };
         
-        // 更新日志窗口显示
+        function startModelLogMonitoring() {
+            // 立即跑一次
+            pollModelLogs();
+            
+            if (modelLogPollInterval) {
+                clearInterval(modelLogPollInterval);
+            }
+            modelLogPollInterval = setInterval(pollModelLogs, MODEL_LOG_POLL_INTERVAL_MS);
+        }
+        
+        function stopModelLogMonitoring() {
+            if (modelLogPollInterval) {
+                clearInterval(modelLogPollInterval);
+                modelLogPollInterval = null;
+            }
+            // 中止正在进行的请求
+            ['llm', 'embedding', 'reranker'].forEach(modelType => {
+                const st = modelLogState[modelType];
+                if (st && st.controller) {
+                    try { st.controller.abort(); } catch (e) {}
+                    st.controller = null;
+                }
+            });
+        }
+        
+        // 仅用于刷新占位/动态提示（语言切换时会调用）
         function updateModelLogs() {
             const models = ['llm', 'embedding', 'reranker'];
             models.forEach(modelType => {
@@ -2107,98 +2213,282 @@
                 if (!logWindow) return;
                 
                 const modelData = modelDataCache[modelType];
-                
-                // 获取正确的翻译键
                 const translationKey = modelTypeToTranslationKey[modelType] || modelType;
                 const modelName = getTranslation(translationKey, modelType);
                 
-                // 如果数据还未加载，显示等待状态
+                // 使用结构化 DOM，确保占位信息在“未连接/无数据”时也能显示
+                const structure = ensureLogWindowStructure(modelType);
+                if (!structure) return;
+                const { meta, lines: linesContainer } = structure;
+                
                 if (!modelData) {
-                    if (logWindow.innerHTML === '') {
-                        const waitingText = getTranslation('waiting-for', '等待');
-                        const statusDataText = getTranslation('status-data', '状态数据...');
-                        logWindow.innerHTML = `<div class="model-log-line"><span class="model-log-timestamp">[--:--:--]</span> ${waitingText} ${modelName} ${statusDataText}</div>`;
-                    }
+                    // 尚未拿到 model_status
+                    const waitingText = getTranslation('waiting-for', '等待');
+                    const statusDataText = getTranslation('status-data', '状态数据...');
+                    meta.textContent = `[--:--:--] ${waitingText} ${modelName} ${statusDataText}`;
+                    linesContainer.innerHTML = '';
                     return;
                 }
                 
-                // 如果未启用，显示提示
                 if (!modelData.is_enabled) {
-                    logFetchState[modelType].enabled = false;
+                    // 未启用：直接显示提示
                     const translation = getTranslation('model-not-enabled', '未启用');
-                    logWindow.innerHTML = `<div class="model-log-line"><span class="model-log-timestamp">[--:--:--]</span> ${translation}${modelName}</div>`;
-                } else {
-                    // 模型已启用，检查是否需要获取日志
-                    const isExpanded = logWindow.classList.contains('expanded');
-                    
-                    if (isExpanded) {
-                        // 窗口已展开
-                        if (!logFetchState[modelType].enabled) {
-                            // 刚展开，开始获取日志
-                            logFetchState[modelType].enabled = true;
-                            fetchModelLogs(modelType);
-                        } else {
-                            // 已展开且已启用，定期刷新
-                            const now = Date.now();
-                            if (now - logFetchState[modelType].lastFetch > 5000) {  // 每5秒刷新
-                                fetchModelLogs(modelType);
-                            }
-                        }
-                        // 展开状态下不修改内容，让 fetchModelLogs 处理
-                    } else {
-                        // 窗口已折叠
-                        logFetchState[modelType].enabled = false;
-                        
-                        // 只有在折叠状态且内容为空或是占位符时，才显示提示
-                        const content = logWindow.innerHTML;
-                        const isPlaceholder = content === '' || 
-                            content.includes('点击展开') || 
-                            content.includes('Click to expand') ||
-                            content.includes('未启用') ||
-                            content.includes('Not Enabled') ||
-                            content.includes('等待') ||
-                            content.includes('Waiting');
-                        
-                        if (isPlaceholder) {
-                            const now = new Date();
-                            const timestamp = now.toTimeString().split(' ')[0];
-                            const clickText = getTranslation('click-to-view-logs', '点击展开查看');
-                            const logsText = getTranslation('logs', '日志...');
-                            logWindow.innerHTML = `<div class="model-log-line"><span class="model-log-timestamp">[${timestamp}]</span> ${clickText} ${modelName} ${logsText}</div>`;
-                        }
-                    }
+                    meta.textContent = `[--:--:--] ${translation} ${modelName}`;
+                    linesContainer.innerHTML = '';
+                    return;
                 }
+                
+                // 已启用：如果已有缓存则按缓存渲染；否则显示“日志采集中”提示
+                renderModelLogWindow(modelType);
+            });
+        }
+
+        // 页面首次加载时：即使后端不可达，也要立即渲染模型区的占位文案
+        function initModelUiPlaceholders() {
+            updateModelProgress('llm', null);
+            updateModelProgress('embedding', null);
+            updateModelProgress('reranker', null);
+            updateModelLogs();
+        }
+        
+        function pollModelLogs() {
+            const models = ['llm', 'embedding', 'reranker'];
+            models.forEach(modelType => {
+                const modelData = modelDataCache[modelType];
+                // 没拿到状态数据/未启用时，不拉日志
+                if (!modelData || !modelData.is_enabled) {
+                    return;
+                }
+                
+                const now = Date.now();
+                const st = modelLogState[modelType];
+                if (!st) return;
+                
+                // 间隔控制（避免多个 interval/手动触发叠加）
+                if (now - st.lastFetch < MODEL_LOG_POLL_INTERVAL_MS - 50) {
+                    return;
+                }
+                
+                fetchModelLogs(modelType);
             });
         }
         
-        // 从推理服务器获取日志
+        function mergeLogLines(prevLines, fetchedLines) {
+            if (!Array.isArray(fetchedLines) || fetchedLines.length === 0) return prevLines;
+            if (!Array.isArray(prevLines) || prevLines.length === 0) {
+                return fetchedLines.slice();
+            }
+            
+            // 尝试找到“prev 的尾部”与“fetched 的某一段”之间的重叠，然后只追加新增部分
+            const maxOverlap = Math.min(prevLines.length, fetchedLines.length, 80);
+            
+            // 1) 优先找：prev 尾部 k 行 == fetched 开头 k 行（常见情况：fetched 是尾部窗口）
+            for (let k = maxOverlap; k >= 1; k--) {
+                let ok = true;
+                for (let i = 0; i < k; i++) {
+                    if (prevLines[prevLines.length - k + i] !== fetchedLines[i]) {
+                        ok = false;
+                        break;
+                    }
+                }
+                if (ok) {
+                    return prevLines.concat(fetchedLines.slice(k));
+                }
+            }
+            
+            // 2) 退化策略：用最后一行做锚点
+            const last = prevLines[prevLines.length - 1];
+            const idx = fetchedLines.lastIndexOf(last);
+            if (idx >= 0 && idx < fetchedLines.length - 1) {
+                return prevLines.concat(fetchedLines.slice(idx + 1));
+            }
+            
+            // 3) 再退化：直接拼接并做简单去重（可能丢失顺序中的重复行，但能避免爆炸性重复）
+            const seen = new Set(prevLines.slice(Math.max(0, prevLines.length - 500)));
+            const appended = [];
+            fetchedLines.forEach(line => {
+                if (!seen.has(line)) {
+                    appended.push(line);
+                    seen.add(line);
+                }
+            });
+            return prevLines.concat(appended);
+        }
+        
+        function clampStoredLines(lines) {
+            if (!Array.isArray(lines)) return [];
+            if (lines.length <= MODEL_LOG_MAX_STORED_LINES) return lines;
+            return lines.slice(lines.length - MODEL_LOG_MAX_STORED_LINES);
+        }
+        
+        function ensureLogWindowStructure(modelType) {
+            const logWindow = document.getElementById(modelType + '-log-window');
+            if (!logWindow) return null;
+            
+            let meta = logWindow.querySelector('.model-log-meta');
+            let lines = logWindow.querySelector('.model-log-lines');
+            
+            if (!meta || !lines) {
+                // 仅在第一次初始化时创建结构；后续增量更新只操作子节点
+                logWindow.innerHTML = '';
+                meta = document.createElement('div');
+                meta.className = 'model-log-line model-log-meta';
+                
+                lines = document.createElement('div');
+                lines.className = 'model-log-lines';
+                
+                logWindow.appendChild(meta);
+                logWindow.appendChild(lines);
+            }
+            
+            return { logWindow, meta, lines };
+        }
+        
+        function renderLinesFull(linesContainer, linesToRender) {
+            linesContainer.innerHTML = '';
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < linesToRender.length; i++) {
+                const div = document.createElement('div');
+                div.className = 'model-log-line';
+                div.textContent = linesToRender[i];
+                frag.appendChild(div);
+            }
+            linesContainer.appendChild(frag);
+        }
+        
+        function appendLines(linesContainer, linesToAppend) {
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < linesToAppend.length; i++) {
+                const div = document.createElement('div');
+                div.className = 'model-log-line';
+                div.textContent = linesToAppend[i];
+                frag.appendChild(div);
+            }
+            linesContainer.appendChild(frag);
+        }
+        
+        function renderModelLogWindow(modelType) {
+            const st = modelLogState[modelType];
+            const allLines = (st && Array.isArray(st.lines)) ? st.lines : [];
+            
+            const structure = ensureLogWindowStructure(modelType);
+            if (!structure) return;
+            const { logWindow, meta, lines: linesContainer } = structure;
+            
+            const isExpanded = logWindow.classList.contains('expanded');
+            
+            const translationKey = modelTypeToTranslationKey[modelType] || modelType;
+            const modelName = getTranslation(translationKey, modelType);
+            
+            // 保持用户滚动位置：只有“接近底部”时才自动滚到底
+            const nearBottom = (logWindow.scrollHeight - logWindow.scrollTop - logWindow.clientHeight) < 60;
+            
+            if (allLines.length === 0) {
+                const collecting = getTranslation('logs-collecting', '日志采集中');
+                const buffered = getTranslation('logs-buffered', '已缓存');
+                meta.textContent = `${modelName} ${collecting}... (${buffered}: 0)`;
+                linesContainer.innerHTML = '';
+                return;
+            }
+            
+            const buffered = getTranslation('logs-buffered', '已缓存');
+            const showing = getTranslation('logs-showing', '当前显示');
+            
+            if (isExpanded) {
+                // 展开：增量追加，不做全量 innerHTML 重绘
+                const mode = 'expanded';
+                const modeChanged = st.lastRenderedMode !== mode;
+                
+                // 若发生缓存裁剪/或刚从折叠切换到展开：做一次全量渲染
+                if (st.forceFullRender || modeChanged || st.lastRenderedCount > allLines.length) {
+                    meta.textContent = `${modelName} (${buffered}: ${allLines.length}, ${showing}: ${allLines.length})`;
+                    renderLinesFull(linesContainer, allLines);
+                    st.lastRenderedCount = allLines.length;
+                    st.lastRenderedMode = mode;
+                    st.forceFullRender = false;
+                } else {
+                    const delta = allLines.slice(st.lastRenderedCount);
+                    if (delta.length > 0) {
+                        appendLines(linesContainer, delta);
+                        st.lastRenderedCount = allLines.length;
+                    }
+                    meta.textContent = `${modelName} (${buffered}: ${allLines.length}, ${showing}: ${allLines.length})`;
+                    st.lastRenderedMode = mode;
+                }
+                
+                if (nearBottom) {
+                    logWindow.scrollTop = logWindow.scrollHeight;
+                }
+            } else {
+                // 折叠：只渲染尾部少量行，保持轻量（允许重绘，因为最多 80 行）
+                const mode = 'collapsed';
+                const tailStart = Math.max(0, allLines.length - MODEL_LOG_RENDER_COLLAPSED_LINES);
+                const linesToRender = allLines.slice(tailStart);
+                
+                const modeChanged = st.lastRenderedMode !== mode;
+                const tailChanged = st.lastRenderedTailStart !== tailStart || st.lastRenderedCount !== allLines.length;
+                
+                if (st.forceFullRender || modeChanged || tailChanged || st.lastRenderedCount > allLines.length) {
+                    meta.textContent = `${modelName} (${buffered}: ${allLines.length}, ${showing}: ${linesToRender.length})`;
+                    renderLinesFull(linesContainer, linesToRender);
+                    st.lastRenderedCount = allLines.length;
+                    st.lastRenderedTailStart = tailStart;
+                    st.lastRenderedMode = mode;
+                    st.forceFullRender = false;
+                } else {
+                    // 不需要更新 DOM，只刷新语言/计数
+                    meta.textContent = `${modelName} (${buffered}: ${allLines.length}, ${showing}: ${linesToRender.length})`;
+                    st.lastRenderedMode = mode;
+                }
+            }
+        }
+        
+        // 从推理服务器获取日志（持续轮询：折叠也拉取；前端累积并渲染）
         async function fetchModelLogs(modelType) {
             const logWindow = document.getElementById(modelType + '-log-window');
             if (!logWindow) return;
             
             try {
-                logFetchState[modelType].lastFetch = Date.now();
-                const response = await fetch(`${INFERENCE_SERVER_URL}/api/model_logs/${modelType}?lines=100`);
+                const st = modelLogState[modelType];
+                if (!st) return;
+                
+                // 避免并发/慢请求覆盖新请求
+                if (st.controller) {
+                    try { st.controller.abort(); } catch (e) {}
+                }
+                st.controller = new AbortController();
+                
+                st.lastFetch = Date.now();
+                const response = await fetch(
+                    `${INFERENCE_SERVER_URL}/api/model_logs/${modelType}?lines=${MODEL_LOG_LINES_PER_FETCH}`,
+                    { signal: st.controller.signal }
+                );
                 
                 if (response.ok) {
                     const data = await response.json();
                     if (data.logs && data.logs.length > 0) {
-                        // 渲染日志
-                        const logsHtml = data.logs.map(line => 
-                            `<div class="model-log-line">${escapeHtml(line)}</div>`
-                        ).join('');
-                        logWindow.innerHTML = logsHtml;
-                        
-                        // 滚动到底部
-                        logWindow.scrollTop = logWindow.scrollHeight;
+                        const merged = mergeLogLines(st.lines, data.logs);
+                        const clamped = clampStoredLines(merged);
+                        // 若发生裁剪，需要强制全量重绘一次（避免 DOM 与缓存不一致）
+                        if (clamped.length !== merged.length) {
+                            st.forceFullRender = true;
+                        }
+                        st.lines = clamped;
+                        renderModelLogWindow(modelType);
                     } else {
-                        const translationKey = modelTypeToTranslationKey[modelType];
-                        const modelName = getTranslation(translationKey, modelType);
-                        const noLogsText = getTranslation('no-logs-output', '暂无日志输出');
-                        logWindow.innerHTML = `<div class="model-log-line"><span class="model-log-timestamp">[${new Date().toTimeString().split(' ')[0]}]</span> ${modelName} ${noLogsText}</div>`;
+                        // 没有新日志：不覆盖已有内容；若为空则显示提示
+                        const st2 = modelLogState[modelType];
+                        if (st2 && (!st2.lines || st2.lines.length === 0)) {
+                            const translationKey = modelTypeToTranslationKey[modelType];
+                            const modelName = getTranslation(translationKey, modelType);
+                            const noLogsText = getTranslation('no-logs-output', '暂无日志输出');
+                            logWindow.innerHTML = `<div class="model-log-line"><span class="model-log-timestamp">[${new Date().toTimeString().split(' ')[0]}]</span> ${modelName} ${noLogsText}</div>`;
+                        }
                     }
                 }
             } catch (error) {
+                // AbortController 中止属于正常情况
+                if (error && error.name === 'AbortError') return;
                 console.debug(`获取 ${modelType} 日志失败:`, error);
                 // 不覆盖现有内容，静默失败
             }
@@ -2229,8 +2519,11 @@
             // 启动模型状态监控
             startModelStatusMonitoring();
             
-            // 定期更新日志显示
-            setInterval(updateModelLogs, 3000);
+            // 启动模型日志持续采集（折叠也拉取）
+            startModelLogMonitoring();
+
+            // 首次占位渲染（避免“未连接时文案不显示，切语言才显示”）
+            initModelUiPlaceholders();
         });
 
         // 语言翻译系统
@@ -2279,7 +2572,11 @@
                 'status-data': '状态数据...',
                 'click-to-view-logs': '点击展开查看',
                 'logs': '日志...',
-                'no-logs-output': '暂无日志输出'
+                'no-logs-output': '暂无日志输出',
+                'inference-engine-starting': '推理引擎未连接/启动中，等待模型加载数据',
+                'logs-collecting': '日志采集中',
+                'logs-buffered': '已缓存',
+                'logs-showing': '当前显示'
             },
             'en': {
                 'title': 'RM - 01 Dashboard',
@@ -2325,7 +2622,11 @@
                 'status-data': 'status data...',
                 'click-to-view-logs': 'Click to expand',
                 'logs': 'logs...',
-                'no-logs-output': 'No logs available'
+                'no-logs-output': 'No logs available',
+                'inference-engine-starting': 'Inference engine disconnected/starting, waiting for model loading data',
+                'logs-collecting': 'Collecting logs',
+                'logs-buffered': 'Buffered',
+                'logs-showing': 'Showing'
             }
         };
 
